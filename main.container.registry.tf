@@ -12,7 +12,15 @@ module "container_registry" {
   private_dns_zone_id                     = local.container_registry_dns_zone_id
   subnet_id                               = local.container_registry_private_endpoint_subnet_id
   tags                                    = var.tags
-  use_zone_redundancy                     = var.use_zone_redundancy ? true : null
+  use_zone_redundancy                     = var.use_zone_redundancy
+}
+
+resource "azurerm_role_assignment" "custom_container_registry_pull" {
+  count = var.user_assigned_managed_identity_creation_enabled && var.custom_container_registry_id != null ? 1 : 0
+
+  principal_id         = local.user_assigned_managed_identity_principal_id
+  scope                = var.custom_container_registry_id
+  role_definition_name = "AcrPull"
 }
 
 resource "time_sleep" "delay_after_container_image_build" {
