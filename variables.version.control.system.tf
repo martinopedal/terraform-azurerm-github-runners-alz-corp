@@ -124,6 +124,17 @@ variable "version_control_system_runner_group" {
   description = "The runner group to add the runner to."
 }
 
+variable "version_control_system_github_url" {
+  type        = string
+  default     = "github.com"
+  description = "The base URL for GitHub. Use the default 'github.com' for standard GitHub Enterprise Cloud, or '<subdomain>.ghe.com' for GitHub Enterprise Cloud with data residency."
+
+  validation {
+    condition     = can(regex("^[a-zA-Z0-9][a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$", var.version_control_system_github_url))
+    error_message = "The version_control_system_github_url must be a valid domain name (e.g., 'github.com' or 'mycompany.ghe.com'). Do not include the protocol prefix (https://)."
+  }
+}
+
 variable "version_control_system_runner_scope" {
   type        = string
   default     = "repo"

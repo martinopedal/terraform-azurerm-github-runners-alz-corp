@@ -31,11 +31,15 @@ locals {
     },
     {
       name  = "GH_RUNNER_URL"
-      value = var.version_control_system_runner_scope == "repo" ? local.github_repository_url : "https://github.com/${var.version_control_system_organization}"
+      value = var.version_control_system_runner_scope == "repo" ? local.github_repository_url : "https://${var.version_control_system_github_url}/${var.version_control_system_organization}"
     },
     {
       name  = "GH_RUNNER_GROUP"
       value = var.version_control_system_runner_group
+    },
+    {
+      name  = "GH_RUNNER_API_URL"
+      value = var.version_control_system_github_url != "github.com" ? "https://api.${var.version_control_system_github_url}" : ""
     }
   ]
 }
