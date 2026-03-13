@@ -1,6 +1,5 @@
 module "container_app_job" {
   source = "./modules/container-app-job"
-  count  = local.deploy_container_app ? 1 : 0
 
   container_app_environment_id      = local.container_app_environment_id
   container_cpu                     = var.container_app_container_cpu
@@ -10,7 +9,7 @@ module "container_app_job" {
   job_container_name                = var.container_app_job_container_name
   job_name                          = var.container_app_job_name
   keda_meta_data                    = local.keda_meta_data
-  keda_rule_type                    = var.version_control_system_type == local.version_control_system_azure_devops ? "azure-pipelines" : "github-runner"
+  keda_rule_type                    = var.version_control_system_type == "azuredevops" ? "azure-pipelines" : "github-runner"
   location                          = var.location
   max_execution_count               = var.container_app_max_execution_count
   min_execution_count               = var.container_app_min_execution_count
@@ -23,9 +22,9 @@ module "container_app_job" {
   sensitive_environment_variables   = local.sensitive_environment_variables
   user_assigned_managed_identity_id = local.user_assigned_managed_identity_id
   environment_variables_placeholder = local.environment_variables_placeholder
-  managed_identity_auth_enabled     = var.version_control_system_type == local.version_control_system_azure_devops && var.version_control_system_authentication_method == "uami"
+  managed_identity_auth_enabled     = var.version_control_system_type == "azuredevops" && var.version_control_system_authentication_method == "uami"
   placeholder_container_name        = var.container_app_placeholder_container_name
-  placeholder_job_creation_enabled  = var.version_control_system_type == local.version_control_system_azure_devops
+  placeholder_job_creation_enabled  = var.version_control_system_type == "azuredevops"
   placeholder_job_name              = var.container_app_placeholder_job_name
   placeholder_replica_retry_limit   = var.container_app_placeholder_replica_retry_limit
   placeholder_replica_timeout       = var.container_app_placeholder_replica_timeout
@@ -36,7 +35,6 @@ module "container_app_job" {
   depends_on = [
     module.container_registry,
     azurerm_role_assignment.custom_container_registry_pull,
-    azurerm_private_dns_zone_virtual_network_link.container_registry,
     time_sleep.delay_after_container_image_build,
     time_sleep.delay_after_container_app_environment_creation
   ]

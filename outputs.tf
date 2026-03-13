@@ -1,16 +1,21 @@
-output "container_app_subnet_resource_id" {
-  description = "The subnet id of the container app job."
-  value       = local.container_app_subnet_id
+output "container_app_environment_name" {
+  description = "The name of the container app environment."
+  value       = local.container_app_environment_name
 }
 
-output "container_instance_names" {
-  description = "The names of the container instances."
-  value       = local.deploy_container_instance ? { for key, value in module.container_instance : key => value.name } : null
+output "container_app_environment_resource_id" {
+  description = "The resource ID of the container app environment."
+  value       = local.container_app_environment_id
 }
 
-output "container_instance_resource_ids" {
-  description = "The resource ids of the container instances."
-  value       = local.deploy_container_instance ? { for key, value in module.container_instance : key => value.resource_id } : null
+output "container_app_job_name" {
+  description = "The name of the container app job."
+  value       = module.container_app_job.name
+}
+
+output "container_app_job_resource_id" {
+  description = "The resource ID of the container app job."
+  value       = module.container_app_job.resource_id
 }
 
 output "container_registry_login_server" {
@@ -24,66 +29,26 @@ output "container_registry_name" {
 }
 
 output "container_registry_resource_id" {
-  description = "The container registry resource id."
+  description = "The container registry resource ID."
   value       = var.container_registry_creation_enabled ? module.container_registry[0].resource_id : null
 }
 
-output "job_name" {
-  description = "The name of the container app job."
-  value       = local.deploy_container_app ? module.container_app_job[0].name : null
-}
-
-output "job_resource_id" {
-  description = "The resource id of the container app job."
-  value       = local.deploy_container_app ? module.container_app_job[0].resource_id : null
-}
-
-output "name" {
-  description = "The name of the container app environment."
-  value       = local.deploy_container_app ? local.container_app_environment_name : null
-}
-
-output "placeholder_job_name" {
-  description = "The name of the placeholder contaienr app job."
-  value       = local.deploy_container_app ? module.container_app_job[0].placeholder_job_name : null
-}
-
-output "placeholder_job_resource_id" {
-  description = "The resource id of the placeholder container app job."
-  value       = local.deploy_container_app ? module.container_app_job[0].placeholder_job_resource_id : null
-}
-
-output "private_dns_zone_subnet_resource_id" {
-  description = "The private dns zone id of the container registry."
-  value       = local.container_registry_private_endpoint_subnet_id
-}
-
-output "resource_id" {
-  description = "The resource id of the container app environment."
-  value       = local.deploy_container_app ? local.container_app_environment_id : null
+output "resource_group_name" {
+  description = "The name of the resource group."
+  value       = local.resource_group_name
 }
 
 output "user_assigned_managed_identity_client_id" {
-  description = "The client id of the user assigned managed identity."
+  description = "The client ID of the user assigned managed identity."
   value       = var.user_assigned_managed_identity_creation_enabled ? module.user_assigned_managed_identity[0].client_id : null
 }
 
 output "user_assigned_managed_identity_id" {
-  description = "The resource id of the user assigned managed identity."
+  description = "The resource ID of the user assigned managed identity."
   value       = var.user_assigned_managed_identity_creation_enabled ? module.user_assigned_managed_identity[0].resource_id : var.user_assigned_managed_identity_id
 }
 
 output "user_assigned_managed_identity_principal_id" {
-  description = "The principal id of the user assigned managed identity."
+  description = "The principal ID of the user assigned managed identity."
   value       = var.user_assigned_managed_identity_creation_enabled ? module.user_assigned_managed_identity[0].principal_id : var.user_assigned_managed_identity_principal_id
-}
-
-output "virtual_network_name" {
-  description = "The virtual network name."
-  value       = var.use_private_networking && var.virtual_network_creation_enabled ? module.virtual_network[0].name : var.virtual_network_name
-}
-
-output "virtual_network_resource_id" {
-  description = "The virtual network resource id."
-  value       = var.use_private_networking && var.virtual_network_creation_enabled ? module.virtual_network[0].resource_id : null
 }

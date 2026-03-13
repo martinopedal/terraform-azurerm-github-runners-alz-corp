@@ -10,19 +10,26 @@ variable "postfix" {
 
   validation {
     condition     = length(var.postfix) <= 20
-    error_message = "Variable 'name' must be less than 20 characters due to container app job naming restrictions. '${var.postfix}' is ${length(var.postfix)} characters."
+    error_message = "Variable 'postfix' must be less than 20 characters due to container app job naming restrictions. '${var.postfix}' is ${length(var.postfix)} characters."
   }
 }
 
-variable "compute_types" {
-  type        = set(string)
-  default     = ["azure_container_app"]
-  description = "The types of compute to use. Allowed values are 'azure_container_app' and 'azure_container_instance'."
+variable "container_app_subnet_id" {
+  type        = string
+  description = "The resource ID of the subnet for the Container App Environment. Must have delegation for `Microsoft.App/environments`. Provided by ALZ Vending Module."
+  nullable    = false
+}
 
-  validation {
-    condition     = alltrue([for compute_type in var.compute_types : contains(["azure_container_app", "azure_container_instance"], compute_type)])
-    error_message = "compute_types must be a combination of 'azure_container_app' and 'azure_container_instance'"
-  }
+variable "container_registry_private_endpoint_subnet_id" {
+  type        = string
+  description = "The resource ID of the subnet for the Container Registry private endpoint. Provided by ALZ Vending Module."
+  nullable    = false
+}
+
+variable "container_registry_dns_zone_id" {
+  type        = string
+  default     = null
+  description = "The ID of the private DNS zone for the container registry (`privatelink.azurecr.io`). If null, DNS resolution is assumed to be handled by Azure Policy or central DNS infrastructure."
 }
 
 variable "delays" {
@@ -52,11 +59,11 @@ variable "lock" {
   })
   default     = null
   description = <<DESCRIPTION
-  Controls the Resource Lock configuration for this resource. The following properties can be specified:
+Controls the Resource Lock configuration for this resource. The following properties can be specified:
 
-  - `kind` - (Required) The type of lock. Possible values are `\"CanNotDelete\"` and `\"ReadOnly\"`.
-  - `name` - (Optional) The name of the lock. If not specified, a name will be generated based on the `kind` value. Changing this forces the creation of a new resource.
-  DESCRIPTION
+- `kind` - (Required) The type of lock. Possible values are `"CanNotDelete"` and `"ReadOnly"`.
+- `name` - (Optional) The name of the lock. If not specified, a name will be generated based on the `kind` value.
+DESCRIPTION
 
   validation {
     condition     = var.lock != null ? contains(["CanNotDelete", "ReadOnly"], var.lock.kind) : true
@@ -64,28 +71,16 @@ variable "lock" {
   }
 }
 
-variable "log_analytics_workspace_internet_ingestion_enabled" {
-  type        = bool
-  default     = null
-  description = "Whether or not to enable internet ingestion for the Log Analytics workspace. If null, defaults to opposite of use_private_networking (true when private networking is false)."
-}
-
-variable "log_analytics_workspace_internet_query_enabled" {
-  type        = bool
-  default     = null
-  description = "Whether or not to enable internet query for the Log Analytics workspace. If null, defaults to opposite of use_private_networking (true when private networking is false)."
-}
-
 variable "resource_group_creation_enabled" {
   type        = bool
   default     = true
-  description = "Whether or not to create a resource group."
+  description = "Whether or not to create a resource group. Set to `false` if the resource group is provided by ALZ Vending Module."
 }
 
 variable "resource_group_name" {
   type        = string
   default     = null
-  description = "The resource group where the resources will be deployed. Must be specified if `resource_group_creation_enabled == false`"
+  description = "The resource group where the resources will be deployed. Must be specified if `resource_group_creation_enabled == false`."
 }
 
 variable "tags" {
@@ -94,43 +89,20 @@ variable "tags" {
   description = "(Optional) Tags of the resource."
 }
 
-variable "use_private_networking" {
-  type        = bool
-  default     = true
-  description = "Whether or not to use private networking for the container registry."
-}
-
 variable "use_zone_redundancy" {
   type        = bool
   default     = true
-  description = "Enable zone redundancy for the deployment"
+  description = "Enable zone redundancy for the deployment."
 
   validation {
-    condition     = !(var.use_zone_redundancy == true && var.use_private_networking == false)
-    error_message = "Zone redundancy requires private networking to be enabled. When use_zone_redundancy is true, use_private_networking must also be true because infrastructure_subnet_id is required for zone redundant deployments."
-  }
-  validation {
     condition = !(var.use_zone_redundancy == true && contains([
-      "australiacentral",
-      "australiacentral2",
-      "canadaeast",
-      "koreasouth",
-      "northcentralus",
-      "southindia",
-      "westindia",
-      "westus",
-      "westcentralus",
-      "ukwest",
-      "brazilsoutheast",
-      "uaecentral",
-      "germanynorth",
-      "norwaywest",
-      "jioindiawest",
-      "jioindiacentral",
-      "switzerlandwest",
-      "francesouth",
+      "australiacentral", "australiacentral2", "canadaeast", "koreasouth",
+      "northcentralus", "southindia", "westindia", "westus", "westcentralus",
+      "ukwest", "brazilsoutheast", "uaecentral", "germanynorth", "norwaywest",
+      "jioindiawest", "jioindiacentral", "switzerlandwest", "francesouth",
       "southafricawest"
     ], var.location))
-    error_message = "Zone redundancy is not supported in the specified location. The following regions do not support zone redundancy: australiacentral, australiacentral2, canadaeast, koreasouth, northcentralus, southindia, westindia, westus, westcentralus, ukwest, brazilsoutheast, uaecentral, germanynorth, norwaywest, jioindiawest, jioindiacentral, switzerlandwest, francesouth, southafricawest."
+    error_message = "Zone redundancy is not supported in the specified location."
   }
 }
+

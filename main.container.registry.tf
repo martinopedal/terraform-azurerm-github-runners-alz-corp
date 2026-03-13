@@ -7,7 +7,7 @@ module "container_registry" {
   location                                = var.location
   name                                    = local.container_registry_name
   resource_group_name                     = local.resource_group_name
-  use_private_networking                  = var.use_private_networking
+  use_private_networking                  = true
   images                                  = local.container_images
   private_dns_zone_id                     = local.container_registry_dns_zone_id
   subnet_id                               = local.container_registry_private_endpoint_subnet_id

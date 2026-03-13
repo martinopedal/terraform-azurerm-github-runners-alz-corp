@@ -7,13 +7,13 @@ variable "container_registry_creation_enabled" {
 variable "container_registry_name" {
   type        = string
   default     = null
-  description = "The name of the container registry. Only required if `container_registry_creation_enabled` is `true`."
+  description = "The name of the container registry. If null, defaults to `acr<postfix>`."
 }
 
 variable "custom_container_registry_id" {
   type        = string
   default     = null
-  description = "The id of the container registry to use if `container_registry_creation_enabled` is `false`."
+  description = "The ID of an existing container registry. Only used if `container_registry_creation_enabled` is `false`."
 }
 
 variable "custom_container_registry_images" {
@@ -21,78 +21,75 @@ variable "custom_container_registry_images" {
     task_name            = string
     dockerfile_path      = string
     context_path         = string
-    context_access_token = optional(string, "a") # This `a` is a dummy value because the context_access_token should not be required in the provider
+    context_access_token = optional(string, "a")
     image_names          = list(string)
   }))
   default     = null
   description = <<DESCRIPTION
-The images to build and push to the container registry. This is only relevant if `container_registry_creation_enabled` is `true` and `use_default_container_image` is set to `false`.
+Custom images to build in the container registry. Only relevant if `container_registry_creation_enabled` is `true` and `use_default_container_image` is `false`.
 
-- task_name: The name of the task to create for building the image (e.g. `image-build-task`)
-- dockerfile_path: The path to the Dockerfile to use for building the image (e.g. `dockerfile`)
-- context_path: The path to the context of the Dockerfile in three sections `<repository-url>#<repository-commit>:<repository-folder-path>` (e.g. https://github.com/Azure/avm-container-images-cicd-agents-and-runners#bc4087f:azure-devops-agent)
-- context_access_token: The access token to use for accessing the context. Supply a PAT if targetting a private repository.
-- image_names: A list of the names of the images to build (e.g. `["image-name:tag"]`)
-
+- `task_name` - Name of the ACR build task
+- `dockerfile_path` - Path to the Dockerfile (e.g. `dockerfile`)
+- `context_path` - Context in format `<repository-url>#<commit>:<folder-path>`
+- `context_access_token` - Access token for the context repository
+- `image_names` - List of image names to build (e.g. `["image-name:tag"]`)
 DESCRIPTION
 }
 
 variable "custom_container_registry_login_server" {
   type        = string
   default     = null
-  description = "The login server of the container registry to use if `container_registry_creation_enabled` is `false`."
+  description = "The login server of an existing container registry. Required if `container_registry_creation_enabled` is `false`."
 }
 
 variable "custom_container_registry_password" {
   type        = string
   default     = null
-  description = "The password of the container registry to use if `container_registry_creation_enabled` is `false`."
+  description = "The password for an existing container registry."
   sensitive   = true
 }
 
 variable "custom_container_registry_username" {
   type        = string
   default     = null
-  description = "The username of the container registry to use if `container_registry_creation_enabled` is `false`."
+  description = "The username for an existing container registry."
 }
 
 variable "default_image_name" {
   type        = string
   default     = null
-  description = "The default image name to use if no custom image is provided."
+  description = "The default image name. If null, auto-detected from `version_control_system_type`."
 }
 
 variable "default_image_registry_dockerfile_path" {
   type        = string
   default     = "dockerfile"
-  description = "The default image registry Dockerfile path to use if no custom image is provided."
+  description = "The Dockerfile path for the default image build."
 }
 
 variable "default_image_repository_commit" {
   type        = string
   default     = "221742d"
-  description = "The default image repository commit to use if no custom image is provided."
+  description = "The commit SHA of the default image repository."
 }
 
 variable "default_image_repository_folder_paths" {
   type = map(string)
   default = {
-    azuredevops-container-app      = "azure-devops-agent-aca"
-    github-container-app           = "github-runner-aca"
-    azuredevops-container-instance = "azure-devops-agent-aci"
-    github-container-instance      = "github-runner-aci"
+    azuredevops-container-app = "azure-devops-agent-aca"
+    github-container-app      = "github-runner-aca"
   }
-  description = "The default image repository folder path to use if no custom image is provided."
+  description = "Map of image type to folder path in the default image repository."
 }
 
 variable "default_image_repository_url" {
   type        = string
   default     = "https://github.com/Azure/avm-container-images-cicd-agents-and-runners"
-  description = "The default image repository URL to use if no custom image is provided."
+  description = "The URL of the default image repository."
 }
 
 variable "use_default_container_image" {
   type        = bool
   default     = true
-  description = "Whether or not to use the default container image provided by the module."
+  description = "Whether to use the default container image provided by the module."
 }
