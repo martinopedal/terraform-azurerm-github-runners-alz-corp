@@ -4,13 +4,13 @@ This module deploys self-hosted Azure DevOps Agents and Github Runners with supp
 
 ## Features
 
-- Deploys Azure DevOps Agents with PAT or UAMI authentication
-- Deploys Github Runners with PAT or GitHub App authentication
-- Supports Azure Container Apps with KEDA auto scaling
-- Supports Azure Container Instances
-- Supports public or private networking
-- Creates all required Azure resources or use existing ones
-- No PAT token management required with UAMI authentication
+- ✅ Deploys Azure DevOps Agents with PAT or UAMI authentication
+- ✅ Deploys Github Runners with PAT or GitHub App authentication
+- ✅ Supports Azure Container Apps with KEDA auto scaling
+- ✅ Supports Azure Container Instances
+- ✅ Supports public or private networking
+- ✅ Creates all required Azure resources or use existing ones
+- ✅ No PAT token management required with UAMI authentication
 
 ## Authentication Methods
 
