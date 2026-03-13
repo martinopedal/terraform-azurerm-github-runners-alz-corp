@@ -1,227 +1,124 @@
 ---
-description: ' Azure Verified Modules (AVM) and Terraform'
-applyTo: '**/*.terraform, **/*.tf, **/*.tfvars, **/*.tfstate, **/*.tflint.hcl, **/*.tf.json, **/*.tfvars.json'
+description: 'Self-Hosted CI/CD Runners for ALZ Corp - Terraform Module'
+applyTo: '**/*.tf, **/*.tfvars, **/*.md'
 ---
 
-# Azure Verified Modules (AVM) Terraform
+# Copilot Instructions — terraform-azurerm-github-runners-alz-corp
 
-## Overview
+## What This Module Is
 
-Azure Verified Modules (AVM) are pre-built, tested, and validated Terraform and Bicep modules that follow Azure best practices. Use these modules to create, update, or review Azure Infrastructure as Code (IaC) with confidence.
+This is a Terraform module that deploys self-hosted **GitHub Actions Runners** and **Azure DevOps Agents** on **Azure Container Apps (ACA)** in an **Azure Landing Zone Corp** subscription.
 
-## Custom Instructions for GitHub Copilot Agents
+It is a fork of [Azure/terraform-azurerm-avm-ptn-cicd-agents-and-runners](https://github.com/Azure/terraform-azurerm-avm-ptn-cicd-agents-and-runners), stripped down for ALZ Corp:
 
-**IMPORTANT**: When GitHub Copilot Agent or GitHub Copilot Coding Agent is working on this repository, the following local unit tests MUST be executed to comply with PR checks. Failure to run these tests will cause PR validation failures:
+- No VNet, NAT Gateway, or Public IP creation — networking is provided by the ALZ Vending Module and AVNM
+- No Container Instances — ACA only
+- Always private networking with central Azure Firewall egress
+- Subnets are required inputs (`container_app_subnet_id`, `container_registry_private_endpoint_subnet_id`)
 
-```bash
-PORCH_NO_TUI=1 ./avm pre-commit
-git add . && git commit -m "chore: avm pre-commit"
-PORCH_NO_TUI=1 ./avm pr-check
+## Module Structure
+
+```
+.
+├── modules/
+│   ├── container-app-job/    # ACA Job definition (KEDA-scaled runner/agent)
+│   └── container-registry/   # ACR + image build tasks
+├── examples/
+│   ├── github_runners_pat/
+│   ├── github_runners_app_auth/
+│   ├── azuredevops_agents_pat/
+│   └── azuredevops_agents_uami/
+├── locals.tf                          # Core locals
+├── locals.container.app.job.tf        # KEDA + env var config for GitHub/AzDO
+├── main.tf                            # Resource group + lock
+├── main.container.app.environment.tf  # ACA Environment (always internal)
+├── main.container.app.job.tf          # Wires root → container-app-job submodule
+├── main.container.registry.tf         # Wires root → container-registry submodule
+├── main.log.analytics.workspace.tf    # Log Analytics (AVM module)
+├── main.user.assigned.managed.identity.tf  # UAMI (AVM module)
+├── main.telemetry.tf                  # AVM telemetry
+├── variables.tf                       # Core variables (location, postfix, subnets, etc.)
+├── variables.version.control.system.tf    # GitHub/AzDO auth config
+├── variables.container.app.tf         # ACA job sizing, scaling, timeouts
+├── variables.container.registry.tf    # ACR + image build config
+├── variables.log.analytics.workspace.tf
+├── variables.user.assigned.managed.identity.tf
+├── outputs.tf
+├── FIREWALL-RULES.md                  # Required Azure Firewall FQDN openings
+└── README.md
 ```
 
-These commands must be run before any pull request is created or updated to ensure compliance with the Azure Verified Modules standards and prevent CI/CD pipeline failures.
-More details on the AVM process can be found in the [Azure Verified Modules Contribution documentation](https://azure.github.io/Azure-Verified-Modules/contributing/terraform/testing/).
+## Rules for Modifying This Repo
 
-**Failure to run these tests will cause PR validation failures and prevent successful merges.**
+### Do NOT modify these submodules
 
-## Module Discovery
+- `modules/container-app-job/` — shared with upstream, changes here break compatibility
+- `modules/container-registry/` — shared with upstream, changes here break compatibility
 
-### Terraform Registry
+If submodule behavior needs changing, do it through the root module's variable pass-throughs in `main.container.app.job.tf` or `main.container.registry.tf`.
 
-- Search for "avm" + resource name
-- Filter by "Partner" tag to find official AVM modules
-- Example: Search "avm storage account" → filter by Partner
+### Do NOT reintroduce networking resources
 
-### Official AVM Index
+This module does not create VNets, NAT Gateways, Public IPs, or subnets. Those come from the ALZ Vending Module. Do not add them back. The following variables/resources must NOT exist in this module:
 
-- **Terraform Resources**: `https://azure.github.io/Azure-Verified-Modules/indexes/terraform/tf-resource-modules/`
-- **Terraform Patterns**: `https://azure.github.io/Azure-Verified-Modules/indexes/terraform/tf-pattern-modules/`
-- **Bicep Resources**: `https://azure.github.io/Azure-Verified-Modules/indexes/bicep/bicep-resource-modules/`
-- **Bicep Patterns**: `https://azure.github.io/Azure-Verified-Modules/indexes/bicep/bicep-pattern-modules/`
+- `virtual_network_creation_enabled`, `virtual_network_address_space`, `virtual_network_id`
+- `nat_gateway_creation_enabled`, `nat_gateway_id`, `nat_gateway_name`
+- `public_ip_creation_enabled`, `public_ip_id`, `public_ip_name`
+- `use_private_networking` (always private, hardcoded)
 
-## Terraform Module Usage
+### Do NOT reintroduce Container Instance support
 
-### From Examples
+No ACI module, no ACI variables, no `compute_types` variable. ACA is the only compute type.
 
-1. Copy the example code from the module documentation
-2. Replace `source = "../../"` with `source = "Azure/avm-res-{service}-{resource}/azurerm"`
-3. Add `version = "1.0.0"` (use latest available)
-4. Set `enable_telemetry = true`
+### Both GitHub and Azure DevOps must be supported
 
-### From Scratch
+The `version_control_system_type` variable accepts `github` or `azuredevops`. Both code paths must remain functional. When making changes to environment variables, KEDA metadata, or sensitive variables in `locals.container.app.job.tf`, test both paths.
 
-1. Copy the Provision Instructions from module documentation
-2. Configure required and optional inputs
-3. Pin the module version
-4. Enable telemetry
+## Authentication — Three Layers
 
-### Example Usage
+When working on auth-related code, keep these three layers distinct:
 
-```hcl
-module "storage_account" {
-  source  = "Azure/avm-res-storage-storageaccount/azurerm"
-  version = "0.1.0"
+1. **Terraform to Azure** — handled outside this module (pipeline identity, `ARM_*` env vars). This module does not configure it.
 
-  enable_telemetry    = true
-  location            = "East US"
-  name                = "mystorageaccount"
-  resource_group_name = "my-rg"
+2. **Runner/Agent to VCS** — configured by `version_control_system_authentication_method`:
+   - GitHub: `pat` (PAT token) or `github_app` (App ID + installation ID + private key)
+   - Azure DevOps: `pat` (PAT token) or `uami` (Managed Identity registered in AzDO)
+   - These credentials are stored as Container App secrets and used by the runner at runtime to register and poll for jobs.
 
-  # Additional configuration...
-}
-```
+3. **Runner UAMI to Azure resources** — the UAMI attached to the Container App Job can be used by workflow steps to access Azure resources (Storage, Key Vault, etc.) via RBAC.
 
-## Naming Conventions
-
-### Module Types
-
-- **Resource Modules**: `Azure/avm-res-{service}-{resource}/azurerm`
-  - Example: `Azure/avm-res-storage-storageaccount/azurerm`
-- **Pattern Modules**: `Azure/avm-ptn-{pattern}/azurerm`
-  - Example: `Azure/avm-ptn-aks-enterprise/azurerm`
-- **Utility Modules**: `Azure/avm-utl-{utility}/azurerm`
-  - Example: `Azure/avm-utl-regions/azurerm`
-
-### Service Naming
-
-- Use kebab-case for services and resources
-- Follow Azure service names (e.g., `storage-storageaccount`, `network-virtualnetwork`)
-
-## Version Management
-
-### Check Available Versions
-
-- Endpoint: `https://registry.terraform.io/v1/modules/Azure/{module}/azurerm/versions`
-- Example: `https://registry.terraform.io/v1/modules/Azure/avm-res-storage-storageaccount/azurerm/versions`
-
-### Version Pinning Best Practices
-
-- For providers: use pessimistic version constraints for minor version: `version = "~> 1.0"`
-- For modules: Pin to specific versions: `version = "1.2.3"`
-
-## Module Sources
-
-### Terraform Registry
-
-- **URL Pattern**: `https://registry.terraform.io/modules/Azure/{module}/azurerm/latest`
-- **Example**: `https://registry.terraform.io/modules/Azure/avm-res-storage-storageaccount/azurerm/latest`
-
-### GitHub Repository
-
-- **URL Pattern**: `https://github.com/Azure/terraform-azurerm-avm-{type}-{service}-{resource}`
-- **Examples**:
-  - Resource: `https://github.com/Azure/terraform-azurerm-avm-res-storage-storageaccount`
-  - Pattern: `https://github.com/Azure/terraform-azurerm-avm-ptn-aks-enterprise`
-
-## Development Best Practices
-
-### Module Usage
-
-- ✅ **Always** pin module versions
-- ✅ **Start** with official examples from module documentation
-- ✅ **Review** all inputs and outputs before implementation
-- ✅ **Enable** telemetry: `enable_telemetry = true`
-- ✅ **Use** AVM utility modules for common patterns
-
-### Code Quality
-
-- ✅ **Always** run `terraform fmt` after making changes
-- ✅ **Always** run `terraform validate` after making changes
-- ✅ **Use** meaningful variable names and descriptions
-- ✅ **Use** snake_case
-- ✅ **Add** proper tags and metadata
-- ✅ **Document** complex configurations
-
-### Validation Requirements
-
-Before creating or updating any pull request:
+## Validation Before Committing
 
 ```bash
-# Format code
 terraform fmt -recursive
-
-# Validate syntax
 terraform validate
-
-# AVM-specific validation (MANDATORY)
-export PORCH_NO_TUI=1
-./avm pre-commit
-<commit any changes>
-./avm pr-check
 ```
 
-## Tool Integration
+The `avm.ps1` / `avm.bat` dev tooling from upstream has been removed. Standard `terraform fmt` and `terraform validate` are sufficient.
 
-### Use Available Tools
+## File Naming Convention
 
-- **Deployment Guidance**: Use `azure_get_deployment_best_practices` tool
-- **Service Documentation**: Use `microsoft.docs.mcp` tool for Azure service-specific guidance
-- **Schema Information**: Use `query_azapi_resource_schema` & `query_azapi_resource_document` to query AzAPI resources and schemas.
-- **Provider resources and resource schemas**: Use `list_terraform_provider_items` & `query_terraform_schema` to query azurerm resource schema.
+Follow the AVM pattern with dot-separated descriptive filenames:
 
-### GitHub Copilot Integration
+- `variables.{concern}.tf` — e.g. `variables.container.app.tf`
+- `main.{concern}.tf` — e.g. `main.container.registry.tf`
+- `locals.{concern}.tf` — e.g. `locals.container.app.job.tf`
 
-When working with AVM repositories:
+## Key Design Decisions
 
-1. Always check for existing modules before creating new resources
-2. Use the official examples as starting points
-3. Run all validation tests before committing
-4. Document any customizations or deviations from examples
+- `main.container.registry.tf` hardcodes `use_private_networking = true` — this is intentional for ALZ Corp
+- `main.container.app.environment.tf` hardcodes `internal_load_balancer_enabled = true` — no public ingress
+- Log Analytics defaults `internet_ingestion_enabled` and `internet_query_enabled` to `false`
+- The Container App Environment always requires `infrastructure_subnet_id`
+- Private DNS for ACR (`privatelink.azurecr.io`) is expected to be managed centrally (Azure Policy or platform team) — the `container_registry_dns_zone_id` variable is optional
 
-## Common Patterns
+## FIREWALL-RULES.md
 
-### Resource Group Module
+When adding new external dependencies (new container images, new API endpoints), update `FIREWALL-RULES.md` with the required FQDNs. This file is referenced by platform teams configuring Azure Firewall rules.
 
-```hcl
-module "resource_group" {
-  source  = "Azure/avm-res-resources-resourcegroup/azurerm"
-  version = "0.1.0" # use latest
+## README Conventions
 
-  enable_telemetry = true
-  location         = var.location
-  name            = var.resource_group_name
-}
-```
-
-### Virtual Network Module
-
-```hcl
-module "virtual_network" {
-  source  = "Azure/avm-res-network-virtualnetwork/azurerm"
-  version = "0.1.0" # use latest
-
-  enable_telemetry    = true
-  location            = module.resource_group.location
-  name                = var.vnet_name
-  resource_group_name = module.resource_group.name
-  address_space       = ["10.0.0.0/16"]
-}
-```
-
-## Troubleshooting
-
-### Common Issues
-
-1. **Version Conflicts**: Always check compatibility between module and provider versions
-2. **Missing Dependencies**: Ensure all required resources are created first
-3. **Validation Failures**: Run AVM validation tools before committing
-4. **Documentation**: Always refer to the latest module documentation
-
-### Support Resources
-
-- **AVM Documentation**: `https://azure.github.io/Azure-Verified-Modules/`
-- **GitHub Issues**: Report issues in the specific module's GitHub repository
-- **Community**: Azure Terraform Provider GitHub discussions
-
-## Compliance Checklist
-
-Before submitting any AVM-related code:
-
-- [ ] Module version is pinned
-- [ ] Telemetry is enabled
-- [ ] Code is formatted (`terraform fmt`)
-- [ ] Code is validated (`terraform validate`)
-- [ ] AVM pre-commit checks pass (`./avm pre-commit`)
-- [ ] AVM PR checks pass (`./avm pr-check`)
-- [ ] Documentation is updated
-- [ ] Examples are tested and working
+- No AI-generated language patterns
+- Only ✅ and ❌ emojis are permitted — no others
+- Code examples must be functional `main.tf` snippets that work with this module's current interface
+- The `<!-- BEGIN_TF_DOCS -->` / `<!-- END_TF_DOCS -->` markers are for terraform-docs auto-generation
