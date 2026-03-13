@@ -3,7 +3,7 @@ description: 'Self-Hosted CI/CD Runners for ALZ Corp - Terraform Module'
 applyTo: '**/*.tf, **/*.tfvars, **/*.md'
 ---
 
-# Copilot Instructions — terraform-azurerm-github-runners-alz-corp
+# Copilot Instructions - terraform-azurerm-github-runners-alz-corp
 
 ## What This Module Is
 
@@ -11,8 +11,8 @@ This is a Terraform module that deploys self-hosted **GitHub Actions Runners** a
 
 It is a fork of [Azure/terraform-azurerm-avm-ptn-cicd-agents-and-runners](https://github.com/Azure/terraform-azurerm-avm-ptn-cicd-agents-and-runners), stripped down for ALZ Corp:
 
-- No VNet, NAT Gateway, or Public IP creation — networking is provided by the ALZ Vending Module and AVNM
-- No Container Instances — ACA only
+- No VNet, NAT Gateway, or Public IP creation - networking is provided by the ALZ Vending Module and AVNM
+- No Container Instances - ACA only
 - Always private networking with central Azure Firewall egress
 - Subnets are required inputs (`container_app_subnet_id`, `container_registry_private_endpoint_subnet_id`)
 
@@ -52,8 +52,8 @@ It is a fork of [Azure/terraform-azurerm-avm-ptn-cicd-agents-and-runners](https:
 
 ### Do NOT modify these submodules
 
-- `modules/container-app-job/` — shared with upstream, changes here break compatibility
-- `modules/container-registry/` — shared with upstream, changes here break compatibility
+- `modules/container-app-job/` - shared with upstream, changes here break compatibility
+- `modules/container-registry/` - shared with upstream, changes here break compatibility
 
 If submodule behavior needs changing, do it through the root module's variable pass-throughs in `main.container.app.job.tf` or `main.container.registry.tf`.
 
@@ -74,18 +74,18 @@ No ACI module, no ACI variables, no `compute_types` variable. ACA is the only co
 
 The `version_control_system_type` variable accepts `github` or `azuredevops`. Both code paths must remain functional. When making changes to environment variables, KEDA metadata, or sensitive variables in `locals.container.app.job.tf`, test both paths.
 
-## Authentication — Three Layers
+## Authentication - Three Layers
 
 When working on auth-related code, keep these three layers distinct:
 
-1. **Terraform to Azure** — handled outside this module (pipeline identity, `ARM_*` env vars). This module does not configure it.
+1. **Terraform to Azure** - handled outside this module (pipeline identity, `ARM_*` env vars). This module does not configure it.
 
-2. **Runner/Agent to VCS** — configured by `version_control_system_authentication_method`:
+2. **Runner/Agent to VCS** - configured by `version_control_system_authentication_method`:
    - GitHub: `pat` (PAT token) or `github_app` (App ID + installation ID + private key)
    - Azure DevOps: `pat` (PAT token) or `uami` (Managed Identity registered in AzDO)
    - These credentials are stored as Container App secrets and used by the runner at runtime to register and poll for jobs.
 
-3. **Runner UAMI to Azure resources** — the UAMI attached to the Container App Job can be used by workflow steps to access Azure resources (Storage, Key Vault, etc.) via RBAC.
+3. **Runner UAMI to Azure resources** - the UAMI attached to the Container App Job can be used by workflow steps to access Azure resources (Storage, Key Vault, etc.) via RBAC.
 
 ## Validation Before Committing
 
@@ -100,17 +100,17 @@ The `avm.ps1` / `avm.bat` dev tooling from upstream has been removed. Standard `
 
 Follow the AVM pattern with dot-separated descriptive filenames:
 
-- `variables.{concern}.tf` — e.g. `variables.container.app.tf`
-- `main.{concern}.tf` — e.g. `main.container.registry.tf`
-- `locals.{concern}.tf` — e.g. `locals.container.app.job.tf`
+- `variables.{concern}.tf` - e.g. `variables.container.app.tf`
+- `main.{concern}.tf` - e.g. `main.container.registry.tf`
+- `locals.{concern}.tf` - e.g. `locals.container.app.job.tf`
 
 ## Key Design Decisions
 
-- `main.container.registry.tf` hardcodes `use_private_networking = true` — this is intentional for ALZ Corp
-- `main.container.app.environment.tf` hardcodes `internal_load_balancer_enabled = true` — no public ingress
+- `main.container.registry.tf` hardcodes `use_private_networking = true` - this is intentional for ALZ Corp
+- `main.container.app.environment.tf` hardcodes `internal_load_balancer_enabled = true` - no public ingress
 - Log Analytics defaults `internet_ingestion_enabled` and `internet_query_enabled` to `false`
 - The Container App Environment always requires `infrastructure_subnet_id`
-- Private DNS for ACR (`privatelink.azurecr.io`) is expected to be managed centrally (Azure Policy or platform team) — the `container_registry_dns_zone_id` variable is optional
+- Private DNS for ACR (`privatelink.azurecr.io`) is expected to be managed centrally (Azure Policy or platform team) - the `container_registry_dns_zone_id` variable is optional
 
 ## FIREWALL-RULES.md
 
@@ -119,6 +119,6 @@ When adding new external dependencies (new container images, new API endpoints),
 ## README Conventions
 
 - No AI-generated language patterns
-- Only ✅ and ❌ emojis are permitted — no others
+- Only ✅ and ❌ emojis are permitted - no others
 - Code examples must be functional `main.tf` snippets that work with this module's current interface
 - The `<!-- BEGIN_TF_DOCS -->` / `<!-- END_TF_DOCS -->` markers are for terraform-docs auto-generation

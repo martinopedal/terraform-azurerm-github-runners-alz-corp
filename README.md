@@ -1,19 +1,18 @@
 # Self-Hosted CI/CD Runners for Azure Landing Zone Corp
 
 This Terraform module deploys self-hosted **GitHub Actions Runners** and **Azure DevOps Agents**
-on **Azure Container Apps** — purpose-built for **Azure Landing Zone (ALZ) Corp** subscriptions
+on **Azure Container Apps** - purpose-built for **Azure Landing Zone (ALZ) Corp** subscriptions
 with central firewall egress and no public IPs.
 
 It is designed to work with:
 
-- [**ALZ Terraform Modules**](https://github.com/Azure/terraform-azurerm-caf-enterprise-scale) — for platform landing zone
-- [**ALZ Vending Module**](https://github.com/Azure/terraform-azurerm-lz-vending) — for subscription vending (provides Resource Group, VNet, subnets)
-- [**Azure Virtual Network Manager (AVNM)**](https://learn.microsoft.com/azure/virtual-network-manager/overview) — for hub-spoke connectivity
-- **Azure Firewall** — for central egress (see [FIREWALL-RULES.md](./FIREWALL-RULES.md))
+- ✅ [**ALZ Terraform Modules**](https://github.com/Azure/terraform-azurerm-caf-enterprise-scale) - for platform landing zone
+- ✅ [**ALZ Vending Module**](https://github.com/Azure/terraform-azurerm-lz-vending) - for subscription vending (provides Resource Group, VNet, subnets)
+- ✅ [**Azure Virtual Network Manager (AVNM)**](https://learn.microsoft.com/azure/virtual-network-manager/overview) - for hub-spoke connectivity
+- ✅ **Azure Firewall** - for central egress (see [FIREWALL-RULES.md](./FIREWALL-RULES.md))
 
 > **Forked from** [Azure/terraform-azurerm-avm-ptn-cicd-agents-and-runners](https://github.com/Azure/terraform-azurerm-avm-ptn-cicd-agents-and-runners)
-> and streamlined for ALZ Corp. Networking components (VNet, NAT Gateway, Public IP) are removed —
-> those are delivered by your landing zone platform.
+> and adapted for ALZ Corp. Networking components (VNet, NAT Gateway, Public IP) are removed because those are delivered by your landing zone platform.
 
 ---
 
@@ -26,7 +25,7 @@ These are frequently confused, so this section explains each one.
 
 **"How does Terraform authenticate to Azure to create the resources?"**
 
-This is handled **outside this module** — in your CI/CD pipeline or local environment:
+This is handled **outside this module** - in your CI/CD pipeline or local environment:
 
 | Method | When to Use | How |
 |---|---|---|
@@ -137,7 +136,7 @@ Grant the UAMI appropriate RBAC roles on the resources your pipelines need to ac
 |---|---|
 | Virtual Network + Subnets | ALZ Vending Module |
 | Hub-Spoke Connectivity | AVNM |
-| NAT Gateway / Public IP | Not needed — central Azure Firewall egress |
+| NAT Gateway / Public IP | Not needed - central Azure Firewall egress |
 | Azure Firewall Rules | Platform team ([see required rules](./FIREWALL-RULES.md)) |
 | Private DNS Zones | Central DNS infrastructure or Azure Policy |
 
@@ -158,7 +157,7 @@ Grant the UAMI appropriate RBAC roles on the resources your pipelines need to ac
 
 ---
 
-## Usage — GitHub Runners with PAT
+## Usage - GitHub Runners with PAT
 
 ```hcl
 module "github_runners" {
@@ -194,7 +193,7 @@ jobs:
       - run: echo "Running on self-hosted runner"
 ```
 
-## Usage — Azure DevOps Agents with UAMI
+## Usage - Azure DevOps Agents with UAMI
 
 ```hcl
 module "azuredevops_agents" {
@@ -207,7 +206,7 @@ module "azuredevops_agents" {
   container_app_subnet_id                    = module.lz_vending.subnets["aca"].id
   container_registry_private_endpoint_subnet_id = module.lz_vending.subnets["pe"].id
 
-  # Azure DevOps configuration — UAMI (no PAT needed)
+  # Azure DevOps configuration - UAMI (no PAT needed)
   version_control_system_type                  = "azuredevops"
   version_control_system_organization          = "https://dev.azure.com/my-org"
   version_control_system_pool_name             = "alz-corp-pool"
@@ -223,7 +222,7 @@ module "azuredevops_agents" {
 }
 ```
 
-## Usage — GitHub Runners with GitHub App Auth
+## Usage - GitHub Runners with GitHub App Auth
 
 ```hcl
 module "github_runners" {
@@ -253,16 +252,16 @@ module "github_runners" {
 
 ## How It Works
 
-1. **Image Build** — ACR Task builds the runner/agent image from
+1. **Image Build** - ACR Task builds the runner/agent image from
    [Azure/avm-container-images-cicd-agents-and-runners](https://github.com/Azure/avm-container-images-cicd-agents-and-runners)
    (or your custom image)
-2. **Idle** — Container App Job scales to zero. No runners running, no compute cost.
-3. **Job Queued** — A workflow/pipeline is triggered in GitHub or Azure DevOps
-4. **KEDA Scales Up** — The KEDA scaler (`github-runner` or `azure-pipelines`) polls the VCS API,
+2. **Idle** - Container App Job scales to zero. No runners running, no compute cost.
+3. **Job Queued** - A workflow/pipeline is triggered in GitHub or Azure DevOps
+4. **KEDA Scales Up** - The KEDA scaler (`github-runner` or `azure-pipelines`) polls the VCS API,
    detects the queued job, and starts an ephemeral Container App Job execution
-5. **Runner Registers** — The container registers as a runner/agent, picks up the job, runs it
-6. **Runner Terminates** — After the job completes, the ephemeral container terminates
-7. **Scale to Zero** — If no more jobs are queued, KEDA scales back down
+5. **Runner Registers** - The container registers as a runner/agent, picks up the job, runs it
+6. **Runner Terminates** - After the job completes, the ephemeral container terminates
+7. **Scale to Zero** - If no more jobs are queued, KEDA scales back down
 
 ---
 

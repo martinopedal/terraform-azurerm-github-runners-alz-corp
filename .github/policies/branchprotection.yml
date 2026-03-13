@@ -7,7 +7,7 @@ configuration:
     - branchNamePattern: "~default~"
       requiresPullRequestBeforeMerging: true
       requiredApprovingReviewsCount: 0
-      isAdminEnforced: true
+      isAdminEnforced: false
       allowsForcePushes: false
       allowsDeletions: false
       requiresLinearHistory: true

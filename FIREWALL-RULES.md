@@ -8,7 +8,7 @@ image builds, and job execution will fail.
 
 ---
 
-## Azure Container Registry (ACR) — Image Build & Pull
+## Azure Container Registry (ACR) - Image Build & Pull
 
 | FQDN / Endpoint | Port | Protocol | Purpose |
 |---|---|---|---|
@@ -25,7 +25,7 @@ image builds, and job execution will fail.
 
 ---
 
-## GitHub — Runner Registration & Job Execution
+## GitHub - Runner Registration & Job Execution
 
 Required when `version_control_system_type = "github"`:
 
@@ -51,7 +51,7 @@ with equivalent `*.ghe.com` endpoints. Refer to
 
 ---
 
-## Azure DevOps — Agent Registration & Job Execution
+## Azure DevOps - Agent Registration & Job Execution
 
 Required when `version_control_system_type = "azuredevops"`:
 
@@ -73,7 +73,7 @@ Required when `version_control_system_type = "azuredevops"`:
 
 ---
 
-## Azure Platform — Always Required
+## Azure Platform - Always Required
 
 | FQDN / Endpoint | Port | Protocol | Purpose |
 |---|---|---|---|
