@@ -80,42 +80,39 @@ Grant the UAMI appropriate RBAC roles on the resources your pipelines need to ac
 
 ## Architecture
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│  ALZ Platform (Management/Connectivity Subscription)            │
-│  ┌──────────────┐  ┌──────────────┐  ┌───────────────────────┐ │
-│  │ Azure        │  │ AVNM         │  │ Central DNS           │ │
-│  │ Firewall     │  │ Hub-Spoke    │  │ (privatelink.azurecr  │ │
-│  │ (egress)     │  │ Connectivity │  │  .io, etc.)           │ │
-│  └──────┬───────┘  └──────┬───────┘  └───────────┬───────────┘ │
-└─────────┼─────────────────┼──────────────────────┼─────────────┘
-          │                 │                      │
-┌─────────┼─────────────────┼──────────────────────┼─────────────┐
-│  ALZ Corp Subscription (from LZ Vending Module)                 │
-│         │                 │                      │              │
-│  ┌──────┴─────────────────┴──────────────────────┴───────────┐ │
-│  │  VNet (from Vending Module, connected via AVNM)           │ │
-│  │  ┌────────────────────┐  ┌──────────────────────────────┐ │ │
-│  │  │ Subnet: ACA        │  │ Subnet: Private Endpoints    │ │ │
-│  │  │ (delegated to      │  │ (ACR PE)                     │ │ │
-│  │  │  Microsoft.App/    │  │                              │ │ │
-│  │  │  environments)     │  │                              │ │ │
-│  │  └────────┬───────────┘  └──────────────┬───────────────┘ │ │
-│  └───────────┼─────────────────────────────┼─────────────────┘ │
-│              │                             │                    │
-│  ┌───────────┴──────────┐  ┌───────────────┴─────────────────┐ │
-│  │ Container App Env    │  │ Azure Container Registry        │ │
-│  │  ├ Runner/Agent Job  │  │  (Premium, Private Endpoint)    │ │
-│  │  │  (KEDA-scaled)    │  │  ├ github-runner image          │ │
-│  │  │                   │  │  └ azure-devops-agent image     │ │
-│  │  └ UAMI attached     │  └─────────────────────────────────┘ │
-│  └──────────────────────┘                                       │
-│  ┌──────────────────────┐  ┌─────────────────────────────────┐ │
-│  │ Log Analytics        │  │ User Assigned Managed Identity  │ │
-│  │ Workspace            │  │  (ACR pull + optional workload  │ │
-│  └──────────────────────┘  │   access)                       │ │
-│                             └─────────────────────────────────┘ │
-└─────────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TB
+    subgraph Platform["ALZ Platform (Connectivity Subscription)"]
+        FW["Azure Firewall\negress"]
+        AVNM["AVNM\nHub-Spoke"]
+        DNS["Central DNS\nprivatelink.azurecr.io"]
+    end
+
+    subgraph Corp["ALZ Corp Subscription (from Vending Module)"]
+        subgraph VNet["VNet (from Vending, connected via AVNM)"]
+            subgraph ACASnet["Subnet: ACA\nDelegated: Microsoft.App/environments"]
+                CAE["Container App Environment\n(internal/private)"]
+                CAJ["Container App Job\n(KEDA-scaled runner/agent)"]
+                UAMI["User Assigned\nManaged Identity"]
+            end
+            subgraph PESnet["Subnet: Private Endpoints"]
+                ACRPE["ACR Private Endpoint"]
+            end
+        end
+        ACR["Azure Container Registry\n(Premium, private)"]
+        LA["Log Analytics\nWorkspace"]
+    end
+
+    VCS(("GitHub / Azure DevOps"))
+
+    CAJ -->|"Pull image\n(UAMI + AcrPull)"| ACR
+    ACR --- ACRPE
+    ACRPE -.->|"privatelink.azurecr.io"| DNS
+    CAJ -.->|"Egress via UDR"| FW
+    FW -->|"FQDN filtered"| VCS
+    VCS -->|"KEDA polls\nfor queued jobs"| CAJ
+    CAJ -->|"Logs"| LA
+    AVNM ---|"Hub-Spoke\npeering"| VNet
 ```
 
 ---
