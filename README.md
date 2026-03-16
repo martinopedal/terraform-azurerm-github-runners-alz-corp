@@ -80,43 +80,140 @@ Grant the UAMI appropriate RBAC roles on the resources your pipelines need to ac
 
 ## Architecture
 
+```mermaid
+flowchart TB
+    subgraph Platform["ALZ Platform (Connectivity Subscription)"]
+        FW["Azure Firewall\negress"]
+        AVNM["AVNM\nHub-Spoke"]
+        DNS["Central DNS\nprivatelink.azurecr.io"]
+    end
+
+    subgraph Corp["ALZ Corp Subscription (from Vending Module)"]
+        subgraph VNet["VNet (from Vending, connected via AVNM)"]
+            subgraph ACASnet["Subnet: ACA\nDelegated: Microsoft.App/environments"]
+                CAE["Container App Environment\n(internal/private)"]
+                CAJ["Container App Job\n(KEDA-scaled runner/agent)"]
+                UAMI["User Assigned\nManaged Identity"]
+            end
+            subgraph PESnet["Subnet: Private Endpoints"]
+                ACRPE["ACR Private Endpoint"]
+            end
+        end
+        ACR["Azure Container Registry\n(Premium, private)"]
+        LA["Log Analytics\nWorkspace"]
+    end
+
+    VCS(("GitHub / Azure DevOps"))
+
+    CAJ -->|"Pull image\n(UAMI + AcrPull)"| ACR
+    ACR --- ACRPE
+    ACRPE -.->|"privatelink.azurecr.io"| DNS
+    CAJ -.->|"Egress via UDR"| FW
+    FW -->|"FQDN filtered"| VCS
+    VCS -->|"KEDA polls\nfor queued jobs"| CAJ
+    CAJ -->|"Logs"| LA
+    AVNM ---|"Hub-Spoke\npeering"| VNet
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│  ALZ Platform (Management/Connectivity Subscription)            │
-│  ┌──────────────┐  ┌──────────────┐  ┌───────────────────────┐ │
-│  │ Azure        │  │ AVNM         │  │ Central DNS           │ │
-│  │ Firewall     │  │ Hub-Spoke    │  │ (privatelink.azurecr  │ │
-│  │ (egress)     │  │ Connectivity │  │  .io, etc.)           │ │
-│  └──────┬───────┘  └──────┬───────┘  └───────────┬───────────┘ │
-└─────────┼─────────────────┼──────────────────────┼─────────────┘
-          │                 │                      │
-┌─────────┼─────────────────┼──────────────────────┼─────────────┐
-│  ALZ Corp Subscription (from LZ Vending Module)                 │
-│         │                 │                      │              │
-│  ┌──────┴─────────────────┴──────────────────────┴───────────┐ │
-│  │  VNet (from Vending Module, connected via AVNM)           │ │
-│  │  ┌────────────────────┐  ┌──────────────────────────────┐ │ │
-│  │  │ Subnet: ACA        │  │ Subnet: Private Endpoints    │ │ │
-│  │  │ (delegated to      │  │ (ACR PE)                     │ │ │
-│  │  │  Microsoft.App/    │  │                              │ │ │
-│  │  │  environments)     │  │                              │ │ │
-│  │  └────────┬───────────┘  └──────────────┬───────────────┘ │ │
-│  └───────────┼─────────────────────────────┼─────────────────┘ │
-│              │                             │                    │
-│  ┌───────────┴──────────┐  ┌───────────────┴─────────────────┐ │
-│  │ Container App Env    │  │ Azure Container Registry        │ │
-│  │  ├ Runner/Agent Job  │  │  (Premium, Private Endpoint)    │ │
-│  │  │  (KEDA-scaled)    │  │  ├ github-runner image          │ │
-│  │  │                   │  │  └ azure-devops-agent image     │ │
-│  │  └ UAMI attached     │  └─────────────────────────────────┘ │
-│  └──────────────────────┘                                       │
-│  ┌──────────────────────┐  ┌─────────────────────────────────┐ │
-│  │ Log Analytics        │  │ User Assigned Managed Identity  │ │
-│  │ Workspace            │  │  (ACR pull + optional workload  │ │
-│  └──────────────────────┘  │   access)                       │ │
-│                             └─────────────────────────────────┘ │
-└─────────────────────────────────────────────────────────────────┘
+
+---
+
+## How This Differs from the Upstream Module
+
+This module is a fork of [Azure/terraform-azurerm-avm-ptn-cicd-agents-and-runners](https://github.com/Azure/terraform-azurerm-avm-ptn-cicd-agents-and-runners),
+stripped down for ALZ Corp subscriptions. The key difference is **how egress traffic reaches the internet**.
+
+### Upstream Module — Self-Contained Networking
+
+The upstream module creates its own VNet, NAT Gateway, and Public IP.
+Egress goes directly to the internet with no inspection or central governance:
+
+```mermaid
+flowchart LR
+    subgraph Standalone["Standalone Subscription"]
+        subgraph VNet_Up["VNet (created by module)"]
+            Runner_Up["Container App Job\n(runner/agent)"]
+        end
+        NAT["NAT Gateway\n(created by module)"]
+        PIP["Public IP\n(created by module)"]
+    end
+
+    Internet(("Internet\nGitHub / Azure DevOps"))
+
+    Runner_Up -->|"All egress"| NAT
+    NAT --> PIP
+    PIP -->|"Direct to internet\n(no inspection)"| Internet
+
+    style NAT fill:#f96,stroke:#333
+    style PIP fill:#f96,stroke:#333
 ```
+
+**Characteristics:**
+- Module creates and owns the VNet, subnets, NAT Gateway, and Public IP
+- Egress goes **directly** to the internet — no FQDN filtering, no logging, no central governance
+- Suitable for standalone/sandbox subscriptions with no hub connectivity
+- Supports both public and private networking modes
+- Also supports Azure Container Instances (ACI)
+
+### This Module — ALZ Corp with Central Firewall Egress
+
+In ALZ Corp, the landing zone platform provides networking. There is **no Public IP or NAT Gateway
+in the spoke** — all egress is routed through the hub's Azure Firewall via UDR:
+
+```mermaid
+flowchart LR
+    subgraph Hub["ALZ Hub (Connectivity Subscription)"]
+        FW2["Azure Firewall\n(FQDN-filtered egress)"]
+    end
+
+    subgraph Spoke["ALZ Corp Subscription (spoke)"]
+        subgraph VNet_ALZ["VNet (from LZ Vending + AVNM)"]
+            Runner_ALZ["Container App Job\n(runner/agent)"]
+        end
+        UDR["UDR: 0.0.0.0/0 → Firewall"]
+    end
+
+    Internet2(("Internet\nGitHub / Azure DevOps"))
+
+    Runner_ALZ -->|"All egress"| UDR
+    UDR -->|"Via AVNM\nhub-spoke peering"| FW2
+    FW2 -->|"Only allowed FQDNs\n(see FIREWALL-RULES.md)"| Internet2
+
+    style FW2 fill:#4a9,stroke:#333
+    style UDR fill:#4a9,stroke:#333
+```
+
+**Characteristics:**
+- VNet, subnets, and hub connectivity are provided by the **ALZ Vending Module + AVNM** — not by this module
+- **No Public IP, no NAT Gateway** — the spoke has no direct internet path
+- All egress is routed to the **Azure Firewall** in the hub via a UDR (`0.0.0.0/0 → firewall`)
+- The firewall enforces **FQDN-based allow rules** (see [FIREWALL-RULES.md](./FIREWALL-RULES.md)) — only the endpoints needed by the runner are permitted
+- ACR image pulls use a **private endpoint** — no egress needed for image pulls
+- ACA Environment is always **internal** (`internal_load_balancer_enabled = true`) — no public ingress
+- ACI is not supported — ACA only
+
+### Why No Public IP or NAT Gateway?
+
+In the Azure Landing Zone **Corp** topology, spoke subscriptions are designed with **zero direct internet access**:
+
+1. **UDR forces all traffic to the hub firewall** — the `0.0.0.0/0 → Azure Firewall` route means there is no default internet path. A NAT Gateway or Public IP in the spoke would conflict with this routing and break the security model.
+
+2. **Central governance** — the platform team controls what FQDNs are reachable. This is a deliberate design choice in ALZ Corp to ensure all internet-bound traffic is inspected, logged, and filtered.
+
+3. **No public ingress required** — runners are ephemeral and outbound-only. They poll the VCS API for jobs and report back results. There is no inbound connection needed, so no public IP is necessary.
+
+4. **Private endpoints replace public access** — ACR is accessed via private endpoint within the VNet. DNS resolution happens through centrally managed Private DNS Zones. The only traffic that leaves the VNet is to the VCS platform (GitHub/Azure DevOps) and Azure control plane APIs — all through the firewall.
+
+| Aspect | Upstream Module | This Module (ALZ Corp) |
+|---|---|---|
+| VNet | Created by module | Provided by ALZ Vending |
+| Egress | NAT Gateway + Public IP (direct) | Azure Firewall via UDR (inspected) |
+| Public IP | Yes (module-managed) | None |
+| NAT Gateway | Yes (module-managed) | None |
+| FQDN filtering | None | Azure Firewall application rules |
+| ACR access | Public or private endpoint | Private endpoint only |
+| ACA ingress | Configurable (public/private) | Always internal |
+| ACI support | Yes | No (ACA only) |
+| Hub connectivity | Not applicable | AVNM hub-spoke peering |
 
 ---
 
