@@ -9,7 +9,7 @@ resource "azapi_resource" "job" {
       configuration = {
         replicaRetryLimit = var.replica_retry_limit
         replicaTimeout    = var.replica_timeout
-        registries        = local.container_registies
+        registries        = local.container_registries
         eventTriggerConfig = {
           parallelism            = 1
           replicaCompletionCount = 1
@@ -51,7 +51,7 @@ resource "azapi_resource" "placeholder" {
       configuration = {
         replicaRetryLimit = var.placeholder_replica_retry_limit
         replicaTimeout    = var.placeholder_replica_timeout
-        registries        = local.container_registies
+        registries        = local.container_registries
         manualTriggerConfig = {
           parallelism            = 1
           replicaCompletionCount = 1

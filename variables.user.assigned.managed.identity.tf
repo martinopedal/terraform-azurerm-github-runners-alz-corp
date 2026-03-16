@@ -32,6 +32,15 @@ variable "user_assigned_managed_identity_id" {
   type        = string
   default     = null
   description = "The resource ID of an existing user assigned managed identity. Only required if `user_assigned_managed_identity_creation_enabled` is `false`."
+
+  validation {
+    condition = (
+      !var.user_assigned_managed_identity_creation_enabled
+      ? var.user_assigned_managed_identity_id != null
+      : true
+    )
+    error_message = "user_assigned_managed_identity_id must be defined when user_assigned_managed_identity_creation_enabled is false."
+  }
 }
 
 variable "user_assigned_managed_identity_name" {

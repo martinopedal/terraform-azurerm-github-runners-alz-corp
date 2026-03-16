@@ -67,6 +67,15 @@ variable "version_control_system_pool_name" {
   type        = string
   default     = null
   description = "The name of the agent pool. Required for Azure DevOps."
+
+  validation {
+    condition = (
+      var.version_control_system_type == "azuredevops"
+      ? var.version_control_system_pool_name != null && var.version_control_system_pool_name != ""
+      : true
+    )
+    error_message = "version_control_system_pool_name must be defined when version_control_system_type is 'azuredevops'."
+  }
 }
 
 variable "version_control_system_repository" {
