@@ -9,20 +9,20 @@ locals {
   environment_variables = [for env in var.environment_variables : {
     name  = env.name
     value = env.value
-  } if env.value != null && env.value != null]
+  } if env.value != null]
   final_environment_variables = concat(local.environment_variables, local.secret_environment_variables)
   placeholder_environment_variables = [for env in var.environment_variables_placeholder : {
     name  = env.name
     value = env.value
-  } if env.value != null && env.value != null]
+  } if env.value != null]
   secret_environment_variables = [for env in var.sensitive_environment_variables : {
     name      = env.name
     secretRef = env.container_app_secret_name
-  } if env.value != null && env.value != null]
+  } if env.value != null]
   secrets = concat([for env in var.sensitive_environment_variables : {
     name  = env.container_app_secret_name
     value = env.value
-    } if env.value != null && env.value != null],
+    } if env.value != null],
     var.registry_password == null ? [] : [{
       name  = "registry-password"
       value = var.registry_password
@@ -48,7 +48,7 @@ locals {
     }
     env = concat(local.final_environment_variables, local.placeholder_environment_variables)
   }
-  container_registies = var.registry_password == null ? [
+  container_registries = var.registry_password == null ? [
     {
       server   = var.registry_login_server
       identity = var.user_assigned_managed_identity_id
