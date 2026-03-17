@@ -12,7 +12,7 @@ locals {
     repos                     = var.version_control_system_repository
     targetWorkflowQueueLength = var.version_control_system_agent_target_queue_length
     runnerScope               = var.version_control_system_runner_scope
-    githubAPIURL              = var.version_control_system_github_url != "github.com" ? "https://api.${var.version_control_system_github_url}" : ""
+    githubApiURL              = var.version_control_system_github_url != "github.com" ? "https://api.${var.version_control_system_github_url}" : ""
     } : {
     owner                     = var.version_control_system_organization
     repos                     = var.version_control_system_repository
@@ -20,7 +20,7 @@ locals {
     runnerScope               = var.version_control_system_runner_scope
     applicationID             = var.version_control_system_github_application_id
     installationID            = var.version_control_system_github_application_installation_id
-    githubAPIURL              = var.version_control_system_github_url != "github.com" ? "https://api.${var.version_control_system_github_url}" : ""
+    githubApiURL              = var.version_control_system_github_url != "github.com" ? "https://api.${var.version_control_system_github_url}" : ""
   }
 }
 
