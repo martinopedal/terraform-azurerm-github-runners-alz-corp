@@ -76,7 +76,7 @@ See [Usage examples](#usage---github-runners-with-pat) below for GitHub App auth
 This module involves **two separate authentication layers** that serve different purposes.
 These are frequently confused, so this section explains each one.
 
-### Layer 1: Terraform → Azure (Infrastructure Deployment)
+### Layer 1: Terraform to Azure (Infrastructure Deployment)
 
 **"How does Terraform authenticate to Azure to create the resources?"**
 
@@ -91,7 +91,7 @@ This is handled **outside this module** - in your CI/CD pipeline or local enviro
 
 > **This module does NOT configure Terraform authentication.** That's your pipeline's responsibility.
 
-### Layer 2: Runner/Agent → VCS Platform (Runtime Registration)
+### Layer 2: Runner/Agent to VCS Platform (Runtime Registration)
 
 **"How does the self-hosted runner authenticate to GitHub/Azure DevOps to pick up jobs?"**
 
@@ -112,7 +112,7 @@ uses these credentials **at runtime** to register itself and poll for jobs:
 | **PAT** | `version_control_system_personal_access_token` | An Azure DevOps PAT with `Agent Pools (Read & manage)` scope. Stored as a Container App secret. Used by both the agent and the KEDA scaler. |
 | **UAMI** | (No token needed) | A User Assigned Managed Identity registered as a service principal in Azure DevOps with Administrator role on the target agent pool. No secrets to manage or rotate. The agent uses the managed identity to obtain tokens from Entra ID. |
 
-### Layer 3: Runner/Agent UAMI → Azure Resources (Workload Access)
+### Layer 3: Runner/Agent UAMI to Azure Resources (Workload Access)
 
 **"How does the runner access Azure resources (Storage, Key Vault, etc.) during job execution?"**
 
