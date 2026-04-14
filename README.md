@@ -1,18 +1,73 @@
 # Self-Hosted CI/CD Runners for Azure Landing Zone Corp
 
-This Terraform module deploys self-hosted **GitHub Actions Runners** and **Azure DevOps Agents**
-on **Azure Container Apps** - purpose-built for **Azure Landing Zone (ALZ) Corp** subscriptions
-with central firewall egress and no public IPs.
+ALZ Corp subscriptions route all traffic through a central Azure Firewall and have no public IPs. The upstream [AVM CI/CD pattern module](https://github.com/Azure/terraform-azurerm-avm-ptn-cicd-agents-and-runners) creates its own VNet, NAT Gateway, and Public IP, which conflicts with that setup.
 
-It is designed to work with:
+This module removes those networking components and deploys self-hosted **GitHub Actions Runners** or **Azure DevOps Agents** on **Azure Container Apps**, using the VNet and subnets your landing zone already provides.
 
-- ✅ [**ALZ Terraform Modules**](https://github.com/Azure/terraform-azurerm-caf-enterprise-scale) - for platform landing zone
-- ✅ [**ALZ Vending Module**](https://github.com/Azure/terraform-azurerm-lz-vending) - for subscription vending (provides Resource Group, VNet, subnets)
-- ✅ [**Azure Virtual Network Manager (AVNM)**](https://learn.microsoft.com/azure/virtual-network-manager/overview) - for hub-spoke connectivity
-- ✅ **Azure Firewall** - for central egress (see [FIREWALL-RULES.md](./FIREWALL-RULES.md))
+Works with:
 
-> **Forked from** [Azure/terraform-azurerm-avm-ptn-cicd-agents-and-runners](https://github.com/Azure/terraform-azurerm-avm-ptn-cicd-agents-and-runners)
-> and adapted for ALZ Corp. Networking components (VNet, NAT Gateway, Public IP) are removed because those are delivered by your landing zone platform.
+- [ALZ Terraform Modules](https://github.com/Azure/terraform-azurerm-caf-enterprise-scale) for platform landing zone
+- [ALZ Vending Module](https://github.com/Azure/terraform-azurerm-lz-vending) for subscription vending (provides Resource Group, VNet, subnets)
+- [Azure Virtual Network Manager (AVNM)](https://learn.microsoft.com/azure/virtual-network-manager/overview) for hub-spoke connectivity
+- Azure Firewall for central egress (see [FIREWALL-RULES.md](./FIREWALL-RULES.md))
+
+> Forked from [Azure/terraform-azurerm-avm-ptn-cicd-agents-and-runners](https://github.com/Azure/terraform-azurerm-avm-ptn-cicd-agents-and-runners) and adapted for ALZ Corp.
+
+---
+
+## Quick Start
+
+Minimal example: GitHub runners with PAT auth in an ALZ Corp subscription.
+
+```hcl
+module "github_runners" {
+  source  = "martinopedal/github-runners-alz-corp/azurerm"
+
+  postfix  = "ghrun"
+  location = "swedencentral"
+
+  # Subnets from ALZ Vending Module
+  container_app_subnet_id                      = module.lz_vending.subnets["aca"].id
+  container_registry_private_endpoint_subnet_id = module.lz_vending.subnets["pe"].id
+
+  # GitHub
+  version_control_system_type                  = "github"
+  version_control_system_organization          = "my-org"
+  version_control_system_repository            = "my-repo"
+  version_control_system_personal_access_token = var.github_pat
+}
+```
+
+Then reference the runner in your workflow:
+
+```yaml
+jobs:
+  deploy:
+    runs-on: self-hosted
+    steps:
+      - uses: actions/checkout@v4
+      - run: terraform plan
+```
+
+See [Usage examples](#usage---github-runners-with-pat) below for GitHub App auth, Azure DevOps PAT, and Azure DevOps UAMI.
+
+---
+
+## ALZ Provides vs. This Module Creates
+
+| Resource | ALZ / Platform team | This module |
+|---|---|---|
+| Virtual Network + Subnets | Yes (Vending Module) | No |
+| Hub-spoke connectivity | Yes (AVNM) | No |
+| Azure Firewall + egress rules | Yes (Platform team, see [FIREWALL-RULES.md](./FIREWALL-RULES.md)) | No |
+| Private DNS for `privatelink.azurecr.io` | Yes (central DNS or Azure Policy) | No |
+| NAT Gateway / Public IP | Not needed | Not created |
+| Resource Group | Optional (Vending Module can provide) | Yes (optional) |
+| Azure Container Registry (Premium, private) | -- | Yes |
+| Container App Environment (internal) | -- | Yes |
+| Container App Job (KEDA-scaled) | -- | Yes |
+| User Assigned Managed Identity | -- | Yes |
+| Log Analytics Workspace | -- | Yes |
 
 ---
 
@@ -113,29 +168,6 @@ flowchart TB
     CAJ -->|"Logs"| LA
     AVNM ---|"Hub-Spoke\npeering"| VNet
 ```
-
----
-
-## What This Module Creates
-
-| Resource | Purpose |
-|---|---|
-| Resource Group | (optional) Container for all resources |
-| Azure Container Registry | Builds and stores the runner/agent container image |
-| Container App Environment | Serverless hosting for runner jobs (always internal/private) |
-| Container App Job | KEDA-scaled event-driven job that spins up runners on demand |
-| User Assigned Managed Identity | ACR pull access + runner identity for Azure resource access |
-| Log Analytics Workspace | Logs and monitoring for the Container App Environment |
-
-## What This Module Does NOT Create (ALZ Provides These)
-
-| Resource | Provided By |
-|---|---|
-| Virtual Network + Subnets | ALZ Vending Module |
-| Hub-Spoke Connectivity | AVNM |
-| NAT Gateway / Public IP | Not needed - central Azure Firewall egress |
-| Azure Firewall Rules | Platform team ([see required rules](./FIREWALL-RULES.md)) |
-| Private DNS Zones | Central DNS infrastructure or Azure Policy |
 
 ---
 
