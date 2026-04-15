@@ -122,3 +122,13 @@ When adding new external dependencies (new container images, new API endpoints),
 - Only ✅ and ❌ emojis are permitted - no others
 - Code examples must be functional `main.tf` snippets that work with this module's current interface
 - The `<!-- BEGIN_TF_DOCS -->` / `<!-- END_TF_DOCS -->` markers are for terraform-docs auto-generation
+
+## Security rules
+- No secrets in code - use environment variables or GitHub Secrets
+- SHA-pin all GitHub Actions to commit SHAs
+- Use actions/checkout@v6 and actions/setup-python@v6 (Node.js 24 compatible)
+- No enforce_admins on branch protection
+- CodeQL enabled for code scanning
+
+## GitHub-first principle
+Validate changes in GitHub Actions, not locally. Push, trigger workflow, check logs, iterate.
