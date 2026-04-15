@@ -32,11 +32,11 @@ AVM pattern module. See that module's THIRD_PARTY_NOTICES for its full dependenc
 
 ## HashiCorp Terraform Providers
 
-- **azurerm provider:** https://github.com/hashicorp/terraform-provider-azurerm — MPL-2.0
-- **azapi provider:** https://github.com/Azure/terraform-provider-azapi — MPL-2.0
-- **modtm provider:** https://github.com/Azure/terraform-provider-modtm — MIT
-- **random provider:** https://github.com/hashicorp/terraform-provider-random — MPL-2.0
-- **time provider:** https://github.com/hashicorp/terraform-provider-time — MPL-2.0
+- **azurerm provider:** https://github.com/hashicorp/terraform-provider-azurerm (MPL-2.0)
+- **azapi provider:** https://github.com/Azure/terraform-provider-azapi (MPL-2.0)
+- **modtm provider:** https://github.com/Azure/terraform-provider-modtm (MIT)
+- **random provider:** https://github.com/hashicorp/terraform-provider-random (MPL-2.0)
+- **time provider:** https://github.com/hashicorp/terraform-provider-time (MPL-2.0)
 - **Providers are downloaded at `terraform init` time and are not bundled in this repository.**
 
 > **Note on MPL-2.0:** The Mozilla Public License 2.0 is a weak copyleft license that applies
