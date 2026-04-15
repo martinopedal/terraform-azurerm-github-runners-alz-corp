@@ -63,11 +63,11 @@ See [Usage examples](#usage---github-runners-with-pat) below for GitHub App auth
 | Private DNS for `privatelink.azurecr.io` | Yes (central DNS or Azure Policy) | No |
 | NAT Gateway / Public IP | Not needed | Not created |
 | Resource Group | Optional (Vending Module can provide) | Yes (optional) |
-| Azure Container Registry (Premium, private) | -- | Yes |
-| Container App Environment (internal) | -- | Yes |
-| Container App Job (KEDA-scaled) | -- | Yes |
-| User Assigned Managed Identity | -- | Yes |
-| Log Analytics Workspace | -- | Yes |
+| Azure Container Registry (Premium, private) | N/A | Yes |
+| Container App Environment (internal) | N/A | Yes |
+| Container App Job (KEDA-scaled) | N/A | Yes |
+| User Assigned Managed Identity | N/A | Yes |
+| Log Analytics Workspace | N/A | Yes |
 
 ---
 
