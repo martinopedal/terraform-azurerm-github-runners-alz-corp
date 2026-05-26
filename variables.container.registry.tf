@@ -102,7 +102,7 @@ Whether to grant the runner User Assigned Managed Identity AcrPush on the contai
 
 Default is `false` (least privilege): the runner gets AcrPull only, which is enough to start runner pods and pull the runner image.
 
-Set to `true` when your workflows need to push images. Choosing a build pattern (dedicated VNet-joined ACR agent pool, in-runner Buildah, etc.) is a workflow concern handled outside this module. See the [companion cookbook](https://github.com/martinopedal/github-runners-alz-corp-cookbook) for validated patterns.
+Set to `true` when your workflows need to push images. The platform module does not pick a build pattern — pair this opt-in with one of the recipes in the [companion cookbook](https://github.com/martinopedal/github-runners-alz-corp-cookbook) (TF submodule for an ACR agent pool, or a custom runner image with Buildah/Kaniko).
 
 Has no effect when `container_registry_creation_enabled = false`.
 DESCRIPTION

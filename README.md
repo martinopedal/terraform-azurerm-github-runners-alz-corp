@@ -385,11 +385,14 @@ Azure Container Apps Jobs run in a sandboxed environment that does not allow pri
 
 ### Pushing images to the private ACR
 
-The container registry created by this module has `publicNetworkAccess = Disabled` and is reachable only via the Private Endpoint inside your VNet. Choosing a build pattern (dedicated ACR agent pool, in-runner Buildah, etc.) is a workflow concern and lives outside this module.
+The container registry created by this module has `publicNetworkAccess = Disabled` and is reachable only via the Private Endpoint inside your VNet. The platform module stops there — choosing a build pattern (dedicated ACR agent pool, in-runner Buildah, etc.) is a workflow concern handled separately.
 
-Set `runner_acr_push_enabled = true` to grant the runner UAMI `AcrPush` on the registry, then follow one of the validated patterns in the companion cookbook:
+Set `runner_acr_push_enabled = true` to grant the runner UAMI `AcrPush` on the registry, then pick a pattern from the companion cookbook:
 
-- [`github-runners-alz-corp-cookbook`](https://github.com/martinopedal/github-runners-alz-corp-cookbook) → [Building images against the private ACR](https://github.com/martinopedal/github-runners-alz-corp-cookbook/blob/main/patterns/acr-build.md) (covers `az acr build` via a VNet-joined ACR agent pool, in-runner Buildah, and why the shared ACR Tasks pool does not work against this posture).
+- [`github-runners-alz-corp-cookbook`](https://github.com/martinopedal/github-runners-alz-corp-cookbook)
+  - TF submodule [`modules/acr-agent-pool`](https://github.com/martinopedal/github-runners-alz-corp-cookbook/tree/main/modules/acr-agent-pool) for the `az acr build` path (recommended).
+  - Pattern docs at [`patterns/acr-build.md`](https://github.com/martinopedal/github-runners-alz-corp-cookbook/blob/main/patterns/acr-build.md) covering both `az acr build` and in-runner Buildah.
+  - Drop-in [`workflows/container-build.yml`](https://github.com/martinopedal/github-runners-alz-corp-cookbook/blob/main/workflows/container-build.yml).
 
 ### Custom runner images
 
@@ -920,7 +923,7 @@ Description: Whether to grant the runner User Assigned Managed Identity AcrPush 
 
 Default is `false` (least privilege): the runner gets AcrPull only, which is enough to start runner pods and pull the runner image.
 
-Set to `true` when your workflows need to push images. Choosing a build pattern (dedicated VNet-joined ACR agent pool, in-runner Buildah, etc.) is a workflow concern handled outside this module. See the [companion cookbook](https://github.com/martinopedal/github-runners-alz-corp-cookbook) for validated patterns.
+Set to `true` when your workflows need to push images. The platform module does not pick a build pattern — pair this opt-in with one of the recipes in the [companion cookbook](https://github.com/martinopedal/github-runners-alz-corp-cookbook) (TF submodule for an ACR agent pool, or a custom runner image with Buildah/Kaniko).
 
 Has no effect when `container_registry_creation_enabled = false`.
 
