@@ -1,17 +1,6 @@
 # Workflow examples
 
-Drop-in `.github/workflows/*.yml` files that work with the runners deployed by this module. Both rely on the **runner UAMI** for Azure authentication — no PATs, no client secrets.
-
-## [`container-build.yml`](./container-build.yml)
-
-Build a container image and push it to ACR using `az acr build`. The build runs inside ACR Tasks (no Docker daemon on the runner), making it compatible with the daemon-less, non-privileged runner image this module ships.
-
-**When to use:** Any container image build that targets your central ACR.
-
-**What the runner needs:**
-
-- `AcrPush` (or scope map permission on the target namespace) on the ACR
-- Network reachability to the ACR data plane (typically via private endpoint)
+Drop-in `.github/workflows/*.yml` files that work with the runners deployed by this module. They rely on the **runner UAMI** for Azure authentication. No PATs, no client secrets.
 
 ## [`terraform-apply.yml`](./terraform-apply.yml)
 
@@ -24,6 +13,10 @@ Plan-and-apply pattern for Terraform IaC using `ARM_USE_MSI=true` so the azurerm
 - RBAC on the target subscription (Contributor or a tighter custom role)
 - Data-plane access to the Terraform state Storage Account
 - A protected `production` environment in the repo (recommended) for the apply gate
+
+## More patterns
+
+For container build patterns (private ACR, agent pools, Buildah) and other end-to-end recipes, see the companion repo: [`github-runners-alz-corp-cookbook`](https://github.com/martinopedal/github-runners-alz-corp-cookbook).
 
 ## Runner labels
 
