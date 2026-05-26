@@ -387,7 +387,7 @@ Azure Container Apps Jobs run in a sandboxed environment that does not allow pri
 
 The container registry created by this module has `publicNetworkAccess = Disabled` and is reachable only via the Private Endpoint inside your VNet. The platform module stops there — choosing a build pattern (dedicated ACR agent pool, in-runner Buildah, etc.) is a workflow concern handled separately.
 
-Set `runner_acr_push_enabled = true` to grant the runner UAMI `AcrPush` on the registry, then wire the cookbook submodule alongside this module:
+Set `runner_acr_push_enabled = true` to grant the runner UAMI `AcrPush` on the registry, then wire the cookbook submodule alongside this module. The submodule follows the AVM Resource Module specification: you create the subnet, the module consumes it.
 
 ```hcl
 module "runners" {
@@ -397,13 +397,21 @@ module "runners" {
   runner_acr_push_enabled = true
 }
 
+resource "azurerm_subnet" "acr_agent_pool" {
+  name                              = "snet-acragent"
+  resource_group_name               = azurerm_virtual_network.this.resource_group_name
+  virtual_network_name              = azurerm_virtual_network.this.name
+  address_prefixes                  = ["10.0.3.0/24"]
+  private_endpoint_network_policies = "Disabled"
+}
+
 module "acr_agent_pool" {
   source = "github.com/martinopedal/github-runners-alz-corp-cookbook//modules/acr-agent-pool"
 
-  container_registry_resource_id = module.runners.container_registry_resource_id
-  virtual_network_resource_id    = azurerm_virtual_network.this.id
-  location                       = "swedencentral"
-  subnet_address_prefixes        = ["10.0.3.0/24"]
+  name                               = "vnetpool"
+  location                           = "swedencentral"
+  container_registry_resource_id     = module.runners.container_registry_resource_id
+  virtual_network_subnet_resource_id = azurerm_subnet.acr_agent_pool.id
 }
 ```
 
