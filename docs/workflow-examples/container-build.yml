@@ -1,0 +1,53 @@
+# Example: build & push a container image via ACR Tasks
+#
+# Uses the runner UAMI to authenticate against ACR. No Docker daemon required
+# on the runner - `az acr build` ships the build context to ACR Tasks, which
+# builds and pushes inside the registry itself.
+#
+# Prerequisites:
+#   - The runner UAMI has AcrPush on the target ACR (or scope map / namespace).
+#   - The runner can reach the ACR data plane (private endpoint reachable).
+#
+# ⚠ SECURITY: Before adopting in production, pin every `uses:` reference to a
+# commit SHA, e.g. `actions/checkout@de0fac2...  # v6.0.2`. The tags below are
+# kept for readability of this example only.
+#
+# Place this file under .github/workflows/ in your application repo.
+
+name: build-and-push
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'app/**'
+      - '.github/workflows/build-and-push.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  build:
+    # Match the labels you have configured on the runner queue.
+    runs-on: [self-hosted, linux, alz-corp]
+
+    env:
+      ACR_NAME: acrteamcentral
+      IMAGE_REPO: teamx/hello-python
+      IMAGE_TAG: ${{ github.sha }}
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Azure login (managed identity)
+        run: az login --identity --allow-no-subscriptions
+
+      - name: Build & push via ACR Tasks
+        run: |
+          az acr build \
+            --registry "$ACR_NAME" \
+            --image "$IMAGE_REPO:$IMAGE_TAG" \
+            --image "$IMAGE_REPO:latest" \
+            --file app/Dockerfile \
+            app

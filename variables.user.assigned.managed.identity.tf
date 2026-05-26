@@ -52,5 +52,20 @@ variable "user_assigned_managed_identity_name" {
 variable "user_assigned_managed_identity_principal_id" {
   type        = string
   default     = null
-  description = "The principal ID of an existing user assigned managed identity. Only required if `user_assigned_managed_identity_creation_enabled` is `false`."
+  description = <<DESCRIPTION
+The principal ID of an existing user assigned managed identity. Only required if
+`user_assigned_managed_identity_creation_enabled` is `false` AND the module needs
+to assign RBAC to that identity (currently: when `webhook_scaling_enabled = true`,
+the identity is granted `Storage Queue Data Reader` on the webhook Storage Account).
+DESCRIPTION
+
+  validation {
+    condition = (
+      !var.user_assigned_managed_identity_creation_enabled
+      && var.webhook_scaling_enabled
+      ? var.user_assigned_managed_identity_principal_id != null
+      : true
+    )
+    error_message = "user_assigned_managed_identity_principal_id must be defined when bringing your own UAMI (user_assigned_managed_identity_creation_enabled = false) and using webhook_scaling_enabled = true, because the module needs to grant the identity Storage Queue Data Reader on the webhook queue."
+  }
 }

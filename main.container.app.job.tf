@@ -9,7 +9,7 @@ module "container_app_job" {
   job_container_name                = var.container_app_job_container_name
   job_name                          = var.container_app_job_name
   keda_meta_data                    = local.keda_meta_data
-  keda_rule_type                    = var.version_control_system_type == "azuredevops" ? "azure-pipelines" : "github-runner"
+  keda_rule_type                    = var.webhook_scaling_enabled ? "azure-queue" : (var.version_control_system_type == "azuredevops" ? "azure-pipelines" : "github-runner")
   location                          = var.location
   max_execution_count               = var.container_app_max_execution_count
   min_execution_count               = var.container_app_min_execution_count
@@ -22,7 +22,7 @@ module "container_app_job" {
   sensitive_environment_variables   = local.sensitive_environment_variables
   user_assigned_managed_identity_id = local.user_assigned_managed_identity_id
   environment_variables_placeholder = local.environment_variables_placeholder
-  managed_identity_auth_enabled     = var.version_control_system_type == "azuredevops" && var.version_control_system_authentication_method == "uami"
+  managed_identity_auth_enabled     = var.webhook_scaling_enabled || (var.version_control_system_type == "azuredevops" && var.version_control_system_authentication_method == "uami")
   placeholder_container_name        = var.container_app_placeholder_container_name
   placeholder_job_creation_enabled  = var.version_control_system_type == "azuredevops"
   placeholder_job_name              = var.container_app_placeholder_job_name
@@ -35,6 +35,7 @@ module "container_app_job" {
   depends_on = [
     module.container_registry,
     azurerm_role_assignment.custom_container_registry_pull,
+    module.webhook_storage,
     time_sleep.delay_after_container_image_build,
     time_sleep.delay_after_container_app_environment_creation
   ]

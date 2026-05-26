@@ -1,0 +1,80 @@
+# Example: deploy infrastructure with Terraform using the runner UAMI
+#
+# `ARM_USE_MSI = true` tells the azurerm provider to use the runner's managed
+# identity for authentication. No client secret stored anywhere - the runner's
+# UAMI is trusted directly by the target subscription via RBAC.
+#
+# Prerequisites:
+#   - Terraform state backend reachable from the runner (e.g. Storage Account
+#     with PE in the platform LZ).
+#   - The runner UAMI has Contributor (or a tighter custom role) on the target
+#     subscription / resource group.
+#
+# Place this file under .github/workflows/ in your IaC repo.
+#
+# ⚠ SECURITY: Before adopting in production, pin every `uses:` reference to a
+# commit SHA, e.g. `hashicorp/setup-terraform@<sha>  # v3.x`. The tags below are
+# kept for readability of this example only.
+
+name: terraform-apply
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'infra/**'
+      - '.github/workflows/terraform-apply.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  ARM_USE_MSI: "true"
+  ARM_SUBSCRIPTION_ID: ${{ vars.AZ_SUBSCRIPTION_ID }}
+  ARM_TENANT_ID: ${{ vars.AZ_TENANT_ID }}
+  TF_IN_AUTOMATION: "true"
+
+jobs:
+  plan:
+    runs-on: [self-hosted, linux, alz-corp]
+    defaults:
+      run:
+        working-directory: infra
+    steps:
+      - uses: actions/checkout@v6
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.9.8
+          terraform_wrapper: false
+      - run: terraform init -input=false
+      - run: terraform fmt -check -recursive
+      - run: terraform validate
+      - run: terraform plan -input=false -out=tfplan
+      - uses: actions/upload-artifact@v4
+        with:
+          name: tfplan
+          path: infra/tfplan
+          retention-days: 7
+
+  apply:
+    needs: plan
+    if: github.ref == 'refs/heads/main'
+    runs-on: [self-hosted, linux, alz-corp]
+    environment: production
+    defaults:
+      run:
+        working-directory: infra
+    steps:
+      - uses: actions/checkout@v6
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.9.8
+          terraform_wrapper: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: tfplan
+          path: infra/
+      - run: terraform init -input=false
+      - run: terraform apply -input=false -auto-approve tfplan
