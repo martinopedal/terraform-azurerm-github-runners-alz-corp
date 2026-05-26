@@ -387,12 +387,31 @@ Azure Container Apps Jobs run in a sandboxed environment that does not allow pri
 
 The container registry created by this module has `publicNetworkAccess = Disabled` and is reachable only via the Private Endpoint inside your VNet. The platform module stops there — choosing a build pattern (dedicated ACR agent pool, in-runner Buildah, etc.) is a workflow concern handled separately.
 
-Set `runner_acr_push_enabled = true` to grant the runner UAMI `AcrPush` on the registry, then pick a pattern from the companion cookbook:
+Set `runner_acr_push_enabled = true` to grant the runner UAMI `AcrPush` on the registry, then wire the cookbook submodule alongside this module:
 
-- [`github-runners-alz-corp-cookbook`](https://github.com/martinopedal/github-runners-alz-corp-cookbook)
-  - TF submodule [`modules/acr-agent-pool`](https://github.com/martinopedal/github-runners-alz-corp-cookbook/tree/main/modules/acr-agent-pool) for the `az acr build` path (recommended).
-  - Pattern docs at [`patterns/acr-build.md`](https://github.com/martinopedal/github-runners-alz-corp-cookbook/blob/main/patterns/acr-build.md) covering both `az acr build` and in-runner Buildah.
-  - Drop-in [`workflows/container-build.yml`](https://github.com/martinopedal/github-runners-alz-corp-cookbook/blob/main/workflows/container-build.yml).
+```hcl
+module "runners" {
+  source = "github.com/martinopedal/terraform-azurerm-github-runners-alz-corp"
+
+  # ... your existing inputs ...
+  runner_acr_push_enabled = true
+}
+
+module "acr_agent_pool" {
+  source = "github.com/martinopedal/github-runners-alz-corp-cookbook//modules/acr-agent-pool"
+
+  container_registry_resource_id = module.runners.container_registry_resource_id
+  virtual_network_resource_id    = azurerm_virtual_network.this.id
+  location                       = "swedencentral"
+  subnet_address_prefixes        = ["10.0.3.0/24"]
+}
+```
+
+Companion cookbook: [`github-runners-alz-corp-cookbook`](https://github.com/martinopedal/github-runners-alz-corp-cookbook)
+
+- TF submodule [`modules/acr-agent-pool`](https://github.com/martinopedal/github-runners-alz-corp-cookbook/tree/main/modules/acr-agent-pool) for the `az acr build` path (recommended).
+- Pattern docs at [`patterns/acr-build.md`](https://github.com/martinopedal/github-runners-alz-corp-cookbook/blob/main/patterns/acr-build.md) covering both `az acr build` and in-runner Buildah.
+- Drop-in [`workflows/container-build.yml`](https://github.com/martinopedal/github-runners-alz-corp-cookbook/blob/main/workflows/container-build.yml).
 
 ### Custom runner images
 
