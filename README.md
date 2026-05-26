@@ -53,6 +53,61 @@ See [Usage examples](#usage---github-runners-with-pat) below for GitHub App auth
 
 ---
 
+## Quick Start: webhook-driven scaling
+
+For sub-second scale-up with **no GitHub/AzDO API polling**, enable webhook mode. KEDA scales on a private Storage Queue fed by a webhook receiver you host (Function / Logic App / APIM).
+
+```hcl
+module "github_runners" {
+  source  = "martinopedal/github-runners-alz-corp/azurerm"
+
+  postfix  = "ghrun"
+  location = "swedencentral"
+
+  container_app_subnet_id                       = module.lz_vending.subnets["aca"].id
+  container_registry_private_endpoint_subnet_id = module.lz_vending.subnets["pe"].id
+
+  version_control_system_type                  = "github"
+  version_control_system_organization          = "my-org"
+  version_control_system_repository            = "my-repo"
+  version_control_system_personal_access_token = var.github_pat
+
+  # Webhook-driven scaling
+  webhook_scaling_enabled                  = true
+  webhook_storage_private_endpoint_subnet_id = module.lz_vending.subnets["pe"].id
+  webhook_storage_queue_dns_zone_id        = azurerm_private_dns_zone.queue.id
+  webhook_receiver_principal_ids = [
+    azurerm_user_assigned_identity.webhook_receiver.principal_id,
+  ]
+}
+```
+
+**Prerequisites (caller-supplied):**
+- Subnet for the Storage Account private endpoint (can reuse the ACR PE subnet).
+- Private DNS zone `privatelink.queue.core.windows.net` (or central DNS / Azure Policy).
+- A webhook receiver with a managed identity. The module grants it `Storage Queue Data Message Sender` on the queue.
+
+**Receiver contract:** see [WEBHOOKS.md](./WEBHOOKS.md) — payload shape, idempotency rules, and a sample Azure Function.
+
+**Two-phase apply — known issue:** the upstream storage AVM submodule has a `count`-on-unknown bug when the private DNS zone ID is computed in the same plan. If you hit `The "count" value depends on resource attributes that cannot be determined until apply`, run a targeted apply for the network prerequisites first:
+
+```powershell
+terraform apply -target=azurerm_virtual_network.this -target=azurerm_subnet.aca -target=azurerm_subnet.pe -target=azurerm_private_dns_zone.queue -target=azurerm_private_dns_zone.acr
+terraform apply
+```
+
+**Post-deploy verification:**
+
+```powershell
+az containerapp job show -g <rg> -n cj-ghrun --query "properties.configuration | {trigger:triggerType, rules:eventTriggerConfig.scale.rules[].{name:name, type:type, queue:metadata.queueName, account:metadata.accountName, identity:identity}}"
+```
+
+Expect `triggerType=Event`, scaler `azure-queue`, identity is the runner UAMI resource ID, `queueName=runner-jobs`.
+
+End-to-end working example: [`examples/github_runners_webhook/`](./examples/github_runners_webhook/).
+
+---
+
 ## ALZ Provides vs. This Module Creates
 
 | Resource | ALZ / Platform team | This module |
@@ -312,13 +367,13 @@ The default image is built from [`Azure/avm-container-images-cicd-agents-and-run
 
 | Included | Not included |
 |---|---|
-| Base: `mcr.microsoft.com/azure-powershell:ubuntu-22.04` (at the pinned commit `221742d`) | ❌ Docker / `docker-ce-cli` |
+| Base: `mcr.microsoft.com/azure-powershell:ubuntu-22.04` (at the pinned commit `9b4c292`) | ❌ Docker / `docker-ce-cli` |
 | `git`, `curl`, `jq`, `unzip`, `ca-certificates` | ❌ Buildah, Kaniko, Podman |
 | `nodejs`, `ruby` | ❌ Python, .NET SDK, Java, Go |
 | `azure-cli`, PowerShell (`pwsh`) | ❌ Chrome, Firefox, browsers |
 | GitHub Actions runner / Azure Pipelines agent binaries | ❌ Most things `ubuntu-latest` ships |
 
-> The default image is pinned via `default_image_repository_commit`. If you bump the commit, also update `default_image_registry_dockerfile_path` — upstream renamed the file from `dockerfile` to `Dockerfile` after `221742d`, and ACR Tasks run on a case-sensitive filesystem.
+> The default image is pinned via `default_image_repository_commit` (currently `9b4c292`) and built with `default_image_registry_dockerfile_path = "Dockerfile"`. ACR Tasks run on a case-sensitive filesystem, so the path casing must match the upstream repo.
 
 ### Base image choice — why not Alpine?
 
