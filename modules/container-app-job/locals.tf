@@ -76,3 +76,4 @@ locals {
     identity = var.user_assigned_managed_identity_id
   } : {})
 }
+

@@ -63,13 +63,13 @@ variable "default_image_name" {
 
 variable "default_image_registry_dockerfile_path" {
   type        = string
-  default     = "dockerfile"
+  default     = "Dockerfile"
   description = "The Dockerfile path for the default image build."
 }
 
 variable "default_image_repository_commit" {
   type        = string
-  default     = "221742d"
+  default     = "9b4c292"
   description = "The commit SHA of the default image repository."
 }
 

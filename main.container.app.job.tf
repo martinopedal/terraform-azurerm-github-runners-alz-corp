@@ -34,7 +34,7 @@ module "container_app_job" {
 
   depends_on = [
     module.container_registry,
-    azurerm_role_assignment.custom_container_registry_pull,
+    azapi_resource.custom_container_registry_pull,
     module.webhook_storage,
     time_sleep.delay_after_container_image_build,
     time_sleep.delay_after_container_app_environment_creation
