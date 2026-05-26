@@ -21,6 +21,7 @@ locals {
   user_assigned_managed_identity_name           = var.user_assigned_managed_identity_name != null ? var.user_assigned_managed_identity_name : "uami-${var.postfix}"
   version_control_system_agent_name_prefix      = var.version_control_system_agent_name_prefix != null ? var.version_control_system_agent_name_prefix : (var.version_control_system_type == "azuredevops" ? "agent-${var.postfix}" : "runner-${var.postfix}")
   version_control_system_placeholder_agent_name = var.version_control_system_placeholder_agent_name != null ? var.version_control_system_placeholder_agent_name : "placeholder-${var.postfix}"
+  webhook_storage_account_name                  = var.webhook_storage_account_name != null ? var.webhook_storage_account_name : substr(replace("stwh${var.postfix}", "-", ""), 0, 24)
 }
 
 locals {

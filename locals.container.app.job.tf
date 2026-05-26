@@ -1,6 +1,12 @@
 locals {
   keda_meta_data       = tomap(jsondecode(local.keda_meta_data_final))
-  keda_meta_data_final = var.version_control_system_type == "azuredevops" ? jsonencode(local.keda_meta_data_azure_devops) : jsonencode(local.keda_meta_data_github)
+  keda_meta_data_final = var.webhook_scaling_enabled ? jsonencode(local.keda_meta_data_webhook) : (var.version_control_system_type == "azuredevops" ? jsonencode(local.keda_meta_data_azure_devops) : jsonencode(local.keda_meta_data_github))
+
+  keda_meta_data_webhook = {
+    queueName   = var.webhook_queue_name
+    accountName = local.webhook_storage_account_name
+    queueLength = tostring(var.webhook_queue_length_per_runner)
+  }
 
   keda_meta_data_azure_devops = {
     poolName                   = var.version_control_system_pool_name
@@ -69,17 +75,20 @@ locals {
   sensitive_environment_variables       = concat(tolist(jsondecode(local.sensitive_environment_variables_final)), tolist(var.container_app_sensitive_environment_variables))
   sensitive_environment_variables_final = var.version_control_system_type == "azuredevops" ? jsonencode(local.sensitive_environment_variables_azure_devops) : jsonencode(local.sensitive_environment_variables_github)
 
+  # In webhook mode, KEDA uses the azure-queue scaler with UAMI auth - no secret-based KEDA auth
+  # is required. Sensitive vars are still mounted as container secrets/env vars for the runner
+  # itself, but the keda_auth_name is stripped so they aren't wired into the scaler trigger.
   sensitive_environment_variables_azure_devops = var.version_control_system_authentication_method == "uami" ? [
-    { name = "AZP_URL", value = var.version_control_system_organization, container_app_secret_name = "organization-url", keda_auth_name = "organizationURL" },
+    { name = "AZP_URL", value = var.version_control_system_organization, container_app_secret_name = "organization-url", keda_auth_name = var.webhook_scaling_enabled ? null : "organizationURL" },
     { name = "USRMI_ID", value = local.user_assigned_managed_identity_client_id, container_app_secret_name = "user-assigned-identity-client-id", keda_auth_name = null }
     ] : [
-    { name = "AZP_URL", value = var.version_control_system_organization, container_app_secret_name = "organization-url", keda_auth_name = "organizationURL" },
-    { name = "AZP_TOKEN", value = var.version_control_system_personal_access_token, container_app_secret_name = "personal-access-token", keda_auth_name = "personalAccessToken" }
+    { name = "AZP_URL", value = var.version_control_system_organization, container_app_secret_name = "organization-url", keda_auth_name = var.webhook_scaling_enabled ? null : "organizationURL" },
+    { name = "AZP_TOKEN", value = var.version_control_system_personal_access_token, container_app_secret_name = "personal-access-token", keda_auth_name = var.webhook_scaling_enabled ? null : "personalAccessToken" }
   ]
 
   sensitive_environment_variables_github = var.version_control_system_authentication_method == "pat" ? [
-    { name = "ACCESS_TOKEN", value = var.version_control_system_personal_access_token, container_app_secret_name = "personal-access-token", keda_auth_name = "personalAccessToken" }
+    { name = "ACCESS_TOKEN", value = var.version_control_system_personal_access_token, container_app_secret_name = "personal-access-token", keda_auth_name = var.webhook_scaling_enabled ? null : "personalAccessToken" }
     ] : [
-    { name = "APP_PRIVATE_KEY", value = var.version_control_system_github_application_key, container_app_secret_name = "application-key", keda_auth_name = "appKey" }
+    { name = "APP_PRIVATE_KEY", value = var.version_control_system_github_application_key, container_app_secret_name = "application-key", keda_auth_name = var.webhook_scaling_enabled ? null : "appKey" }
   ]
 }

@@ -205,6 +205,21 @@ Required when `version_control_system_type = "azuredevops"`:
 
 ---
 
+## Webhook-Driven Scaling (optional)
+
+Required only when `webhook_scaling_enabled = true`. See [WEBHOOKS.md](./WEBHOOKS.md) for the architecture.
+
+The runner Job's egress to the Storage Queue resolves to a **private IP** in your spoke (private endpoint), so it does not traverse the firewall. The KEDA scaler in the ACA infrastructure also reaches the queue over that private endpoint.
+
+No new public FQDN openings are required on the egress firewall for the queue itself, **provided** that:
+
+- Private DNS for `privatelink.queue.core.windows.net` is configured (Azure Policy / central DNS), and
+- The ACA infrastructure subnet can route to the private endpoint subnet (same VNet or peered).
+
+The **webhook receiver** (Function App / Logic App / APIM) is hosted outside this module, typically in a hub or Online landing zone with public ingress. Its firewall requirements (inbound from GitHub/AzDO webhook IPs, outbound to the private queue endpoint) are the receiver's concern, not this module's.
+
+---
+
 ## Network Rules (non-HTTP)
 
 Service tag-based network rules. Use these when your firewall supports Azure service tags.
