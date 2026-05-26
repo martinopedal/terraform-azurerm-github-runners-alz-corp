@@ -12,6 +12,9 @@ module "github_runners" {
   # --- Resource Group (set false if provided by ALZ Vending) ---
   resource_group_creation_enabled = true
 
+  # --- Grant runner UAMI AcrPush so workflows can run `az acr build` against the ACR ---
+  runner_acr_push_enabled = true
+
   # --- VCS Configuration ---
   version_control_system_type                  = "github"
   version_control_system_organization          = var.github_organization

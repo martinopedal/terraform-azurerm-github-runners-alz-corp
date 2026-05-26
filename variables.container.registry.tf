@@ -93,3 +93,17 @@ variable "use_default_container_image" {
   default     = true
   description = "Whether to use the default container image provided by the module."
 }
+
+variable "runner_acr_push_enabled" {
+  type        = bool
+  default     = false
+  description = <<DESCRIPTION
+Whether to grant the runner User Assigned Managed Identity AcrPush on the container registry created by this module.
+
+Default is `false` (least privilege): the runner gets AcrPull only, which is enough to start runner pods and pull the runner image.
+
+Set to `true` when your workflows need to push images. Choosing a build pattern (dedicated VNet-joined ACR agent pool, in-runner Buildah, etc.) is a workflow concern handled outside this module. See the [companion cookbook](https://github.com/martinopedal/github-runners-alz-corp-cookbook) for validated patterns.
+
+Has no effect when `container_registry_creation_enabled = false`.
+DESCRIPTION
+}

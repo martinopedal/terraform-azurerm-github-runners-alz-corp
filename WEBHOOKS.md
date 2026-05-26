@@ -57,8 +57,8 @@ Outputs to wire up your receiver:
 - `webhook_queue_name`
 - `webhook_storage_account_name`
 - `webhook_storage_account_resource_id`
-- `webhook_queue_url` (`https://<account>.queue.core.windows.net/<queue>`) — use with Azure Storage SDKs
-- `webhook_queue_messages_endpoint` (`https://<account>.queue.core.windows.net/<queue>/messages`) — use if you call the Put Message REST API directly
+- `webhook_queue_url` (`https://<account>.queue.core.windows.net/<queue>`). Use with Azure Storage SDKs.
+- `webhook_queue_messages_endpoint` (`https://<account>.queue.core.windows.net/<queue>/messages`). Use if you call the Put Message REST API directly.
 
 ---
 
@@ -68,7 +68,7 @@ The receiver MUST do all of:
 
 1. **Validate the webhook signature.** For GitHub: HMAC-SHA256 of the raw body with the webhook secret, compared against `X-Hub-Signature-256`. For Azure DevOps: shared-secret basic auth on the service hook subscription.
 2. **Filter events.** Only `workflow_job` with `action = "queued"` (GitHub) or `ms.vss-pipelines.run-state-changed-event` with state `inProgress` (Azure DevOps). Ignore everything else.
-3. **Filter by runner labels / pool name — MUST, not SHOULD.** A receiver that scales on every `self-hosted` job will spawn runners for jobs that belong to unrelated pools in the same org. Match the full label set you registered (e.g. `["self-hosted","linux","alz-corp"]`) or a unique label you assign per pool. For AzDO, filter on the exact pool name.
+3. **Filter by runner labels or pool name (MUST, not SHOULD).** A receiver that scales on every `self-hosted` job will spawn runners for jobs that belong to unrelated pools in the same org. Match the full label set you registered (e.g. `["self-hosted","linux","alz-corp"]`) or a unique label you assign per pool. For AzDO, filter on the exact pool name.
 4. **Deduplicate.** GitHub redelivers webhooks; receivers (Function App / APIM) can also retry. Build a dedupe key from `{provider, repo_or_org, run_id, job_id, run_attempt}` and short-circuit duplicates for a window longer than your message TTL. Without this you will over-scale during webhook storms or transient receiver failures.
 5. **Send one queue message per **deduped** queued job.** Body can be anything (KEDA only looks at queue length); a small JSON with `run_id` / `job_id` / `attempt` is useful for tracing.
 6. **Set an appropriate message TTL.** Messages exist only to bump queue depth so KEDA scales; the runner does not consume them. **Default 300 s** is a safe starting point that absorbs cold-start, image pull, firewall/DNS variability, and ACA scheduling latency. Tune down to `120-180s` only after measuring your env's p95 cold-start; tune up if you see KEDA scaling and the runner failing to claim the job in time.
@@ -156,7 +156,7 @@ Add a **service hook** in Project Settings → Service hooks:
 - **Trigger:** Run state changed → state `inProgress` (or `Build queued`)
 - **URL:** the Function App `https://<func>.azurewebsites.net/api/webhook`
 - **Basic auth:** a shared secret you validate inside the Function
-- **Filter by pool:** match your `version_control_system_pool_name` exactly — see receiver contract item 3.
+- **Filter by pool:** match your `version_control_system_pool_name` exactly. See receiver contract item 3.
 
 > AzDO's run-state events fire on the *run*, not on the *agent job*. They are a coarser signal than GitHub's `workflow_job.queued`. If you need precise per-job scale signals on AzDO, have the receiver call the AzDO REST API on receipt to resolve the queued agent demand for your pool, or accept the imprecision and let the polling fallback handle edge cases.
 
@@ -167,7 +167,7 @@ Add a **service hook** in Project Settings → Service hooks:
 Webhook mode introduces two new secret categories. Plan rotation up front:
 
 - **Webhook shared secret** (GitHub webhook secret / AzDO basic auth password). Store in Key Vault; the receiver should read at startup or per-request. For zero-downtime rotation, accept *two* secrets concurrently during the rotation window, then drop the old one.
-- **Runner credentials are unchanged** in webhook mode — you still need a GitHub PAT, GitHub App key, AzDO PAT, or UAMI for the runner to register. Prefer GitHub App over PAT (per-installation, revocable, no human ownership). For PAT, document rotation cadence and operational impact (rolling job restart to pick up new value).
+- **Runner credentials are unchanged** in webhook mode. You still need a GitHub PAT, GitHub App key, AzDO PAT, or UAMI for the runner to register. Prefer GitHub App over PAT (per-installation, revocable, no human ownership). For PAT, document rotation cadence and operational impact (rolling job restart to pick up new value).
 - **Storage shared keys are disabled** by this module (`shared_access_key_enabled = false`). The receiver and KEDA both use AAD; no key rotation needed on the storage side.
 
 ---
@@ -176,14 +176,14 @@ Webhook mode introduces two new secret categories. Plan rotation up front:
 
 - **The receiver must be reachable from github.com / dev.azure.com.** That means a public ingress point (Function App with public hostname, APIM, Front Door). ALZ Corp policy typically forbids public IPs on resources in *Corp* subscriptions; the standard pattern is to host the receiver in a **hub** or **Online** landing zone, not in the same Corp subscription as the runners. The queue itself stays private inside Corp.
 - **Webhook delivery is best-effort.** GitHub retries failed deliveries for ~24h; receiver-side retries are also common. Implement dedupe per receiver contract item 4 or accept aggressive over-scaling.
-- **Don't try to remove the polling fallback.** If you are nervous about webhook delivery losses, leave the receiver in place but also keep `webhook_scaling_enabled = false` until you have confidence — there is no hybrid mode in this module (KEDA supports only one scaler rule per job here).
+- **Don't try to remove the polling fallback.** If you are nervous about webhook delivery losses, leave the receiver in place but also keep `webhook_scaling_enabled = false` until you have confidence. There is no hybrid mode in this module (KEDA supports only one scaler rule per job here).
 - **GitHub PAT / App / AzDO PAT/UAMI are still required** in webhook mode. The receiver only triggers scale-up; the runner still uses those credentials to register and pick up jobs.
 
 ---
 
 ## Firewall implications
 
-The runner ACA Job needs egress to its **own** Storage Queue private endpoint — that resolves to a private IP in your spoke and doesn't traverse the firewall. No new public FQDN openings are required on the firewall for the queue itself.
+The runner ACA Job needs egress to its **own** Storage Queue private endpoint. That resolves to a private IP in your spoke and doesn't traverse the firewall. No new public FQDN openings are required on the firewall for the queue itself.
 
 The receiver (wherever you host it) needs:
 
