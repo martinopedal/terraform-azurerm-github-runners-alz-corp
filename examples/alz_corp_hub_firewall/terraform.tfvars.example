@@ -1,0 +1,8 @@
+subscription_id              = "2dc87627-13ca-4dae-a46b-817b528b57ec"
+connectivity_subscription_id = "2be052bf-31b0-4693-8081-bf6556421934"
+
+container_app_subnet_id                       = "/subscriptions/2dc87627-13ca-4dae-a46b-817b528b57ec/resourceGroups/rg-corp-aca-runners-swedencentral-001/providers/Microsoft.Network/virtualNetworks/vnet-corp-aca-runners-swedencentral/subnets/snet-aca"
+container_registry_private_endpoint_subnet_id = "/subscriptions/2dc87627-13ca-4dae-a46b-817b528b57ec/resourceGroups/rg-corp-aca-runners-swedencentral-001/providers/Microsoft.Network/virtualNetworks/vnet-corp-aca-runners-swedencentral/subnets/snet-private-endpoints"
+hub_vnet_id                                   = "/subscriptions/2be052bf-31b0-4693-8081-bf6556421934/resourceGroups/rg-connectivity-hub-swedencentral-001/providers/Microsoft.Network/virtualNetworks/vnet-hub-swedencentral"
+azure_firewall_private_ip                     = "10.0.0.4"
+github_personal_access_token                  = "replace-with-github-runner-token"
