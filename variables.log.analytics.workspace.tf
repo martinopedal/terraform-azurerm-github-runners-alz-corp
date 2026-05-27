@@ -8,7 +8,12 @@ variable "log_analytics_workspace_creation_enabled" {
 variable "log_analytics_workspace_id" {
   type        = string
   default     = null
-  description = "The resource Id of the Log Analytics Workspace."
+  description = "The resource Id of the Log Analytics Workspace. Required when `log_analytics_workspace_creation_enabled = false` and the Container App Environment is being created by this module."
+
+  validation {
+    condition     = var.log_analytics_workspace_creation_enabled || var.log_analytics_workspace_id != null
+    error_message = "`log_analytics_workspace_id` must be set when `log_analytics_workspace_creation_enabled = false`. The Container App Environment requires a Log Analytics workspace, otherwise the apply fails with a 400 `LogAnalyticsConfiguration is invalid` from Azure instead of a clear plan-time error."
+  }
 }
 
 variable "log_analytics_workspace_name" {

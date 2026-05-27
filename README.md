@@ -98,6 +98,7 @@ module "github_runners" {
 - Subnet for the Storage Account private endpoint (can reuse the ACR PE subnet).
 - Private DNS zone `privatelink.queue.core.windows.net` (or central DNS / Azure Policy).
 - A webhook receiver with a managed identity. The module grants it `Storage Queue Data Message Sender` on the queue.
+- `storage_use_azuread = true` on the `azurerm` provider block. The Storage Account is created with `shared_access_key_enabled = false` and the AVM submodule's queue resource talks Storage data-plane during apply - without this flag the provider falls back to shared-key auth and the apply fails with `KeyBasedAuthenticationNotPermitted`. See [WEBHOOKS.md](./WEBHOOKS.md#caller-prerequisites-required-when-webhook_scaling_enabled--true) for the full prereq list including the data-plane RBAC role.
 
 **Receiver contract:** see [WEBHOOKS.md](./WEBHOOKS.md) for payload shape, idempotency rules, and a sample Azure Function.
 
@@ -368,6 +369,54 @@ module "github_runners" {
 | **Webhook** (`webhook_scaling_enabled = true`) | GitHub/AzDO webhook to your receiver to Storage Queue to KEDA `azure-queue` scaler | Queue poll interval | Zero polling against VCS | Storage Account + Queue (this module) plus a webhook receiver you host (Function/Logic App/APIM, out of module) |
 
 Full details, receiver contract, and a sample Function in [WEBHOOKS.md](./WEBHOOKS.md).
+
+---
+
+## Runner labels (GitHub only)
+
+By default, GitHub-hosted runners advertise the labels `self-hosted`, `Linux`, and `X64`. Workflows target them with `runs-on: self-hosted`. When you run multiple runner pools (e.g. one per team, one per repo, one per workload class) you usually want to give each pool a distinct label so workflows can pin to it with `runs-on: <label>`.
+
+This module exposes two inputs:
+
+| Variable | Type | Default | Effect |
+|---|---|---|---|
+| `version_control_system_runner_labels` | `list(string)` | `[]` | Extra labels added to the runner at registration. Also forwarded to the KEDA `github-runner` scaler so polling mode scales the right pool. |
+| `version_control_system_runner_no_default_labels` | `bool` | `false` | Pass `--no-default-labels` to the runner. The defaults `self-hosted`/`Linux`/`X64` are dropped; only `version_control_system_runner_labels` remain. |
+
+Both inputs are GitHub-only - setting them with `version_control_system_type = "azuredevops"` fails validation. Azure DevOps uses pools and demands instead.
+
+Example: a dedicated runner pool for a single repo with its own label:
+
+```hcl
+module "github_runners_team_a" {
+  source = "github.com/martinopedal/terraform-azurerm-github-runners-alz-corp?ref=v1.1.0"
+
+  postfix  = "team-a"
+  location = "swedencentral"
+
+  container_app_subnet_id                       = module.lz_vending.subnets["aca"].id
+  container_registry_private_endpoint_subnet_id = module.lz_vending.subnets["pe"].id
+
+  version_control_system_type                  = "github"
+  version_control_system_organization          = "my-org"
+  version_control_system_repository            = "team-a-service"
+  version_control_system_personal_access_token = var.github_pat
+
+  version_control_system_runner_labels = ["team-a", "linux-x64"]
+}
+```
+
+Workflow:
+
+```yaml
+jobs:
+  build:
+    runs-on: [self-hosted, team-a]
+```
+
+**Webhook mode note:** when `webhook_scaling_enabled = true` the KEDA scaler is `azure-queue` and ignores GitHub labels - scaling is driven entirely by the Storage Queue. The labels are still applied at runner registration, so `runs-on` matching still works as expected.
+
+**Reserved env var names:** do not pass `LABELS` or `NO_DEFAULT_LABELS` via `container_app_environment_variables` when using these inputs - Azure Container Apps rejects duplicate environment variable names.
 
 ---
 
@@ -894,7 +943,7 @@ Default: `true`
 
 ### <a name="input_log_analytics_workspace_id"></a> [log\_analytics\_workspace\_id](#input\_log\_analytics\_workspace\_id)
 
-Description: The resource Id of the Log Analytics Workspace.
+Description: The resource Id of the Log Analytics Workspace. Required when `log_analytics_workspace_creation_enabled = false` and the Container App Environment is being created by this module.
 
 Type: `string`
 
@@ -1160,6 +1209,35 @@ Description: The runner group to add the runner to. GitHub only.
 Type: `string`
 
 Default: `null`
+
+### <a name="input_version_control_system_runner_labels"></a> [version\_control\_system\_runner\_labels](#input\_version\_control\_system\_runner\_labels)
+
+Description: Custom labels to register the runner with. **GitHub only.** Azure DevOps uses pool/demands, not labels.
+
+The labels are wired into two places that must always stay in sync:
+
+1. The runner container's `LABELS` env var, which becomes `config.sh --labels <csv>` at registration time.  
+2. The KEDA `github-runner` scaler's `labels` metadata, so the scaler only triggers on queued jobs that request a matching label set.
+
+In webhook scaling mode (`webhook_scaling_enabled = true`) the KEDA scaler is `azure-queue` and ignores GitHub labels; the labels still apply to runner registration, and your webhook receiver is responsible for filtering jobs by label before enqueueing.
+
+Set a unique label (e.g. `["self-hosted","linux","alz-corp"]`) when you operate multiple runner pools in the same org to prevent cross-pool job pickup.
+
+Type: `list(string)`
+
+Default: `[]`
+
+### <a name="input_version_control_system_runner_no_default_labels"></a> [version\_control\_system\_runner\_no\_default\_labels](#input\_version\_control\_system\_runner\_no\_default\_labels)
+
+Description: Disable the default `self-hosted`, `linux`, `<arch>` labels the GitHub runner adds during registration. **GitHub only.**
+
+Forwards `NO_DEFAULT_LABELS=true` to the runner container (applies `--no-default-labels` to `config.sh`) and sets `noDefaultLabels = "true"` on the KEDA `github-runner` scaler so scaling decisions also ignore default labels.
+
+Only set this when you provide an explicit, non-empty `version_control_system_runner_labels` set - a runner with no labels at all cannot be targeted by any workflow.
+
+Type: `bool`
+
+Default: `false`
 
 ### <a name="input_version_control_system_runner_scope"></a> [version\_control\_system\_runner\_scope](#input\_version\_control\_system\_runner\_scope)
 

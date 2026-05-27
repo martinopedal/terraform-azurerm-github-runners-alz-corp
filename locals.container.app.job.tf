@@ -13,26 +13,35 @@ locals {
     targetPipelinesQueueLength = var.version_control_system_agent_target_queue_length
   }
 
-  keda_meta_data_github = var.version_control_system_authentication_method == "pat" ? {
-    owner                     = var.version_control_system_organization
-    repos                     = var.version_control_system_repository
-    targetWorkflowQueueLength = var.version_control_system_agent_target_queue_length
-    runnerScope               = var.version_control_system_runner_scope
-    githubApiURL              = var.version_control_system_github_url != "github.com" ? "https://api.${var.version_control_system_github_url}" : ""
-    } : {
-    owner                     = var.version_control_system_organization
-    repos                     = var.version_control_system_repository
-    targetWorkflowQueueLength = var.version_control_system_agent_target_queue_length
-    runnerScope               = var.version_control_system_runner_scope
-    applicationID             = var.version_control_system_github_application_id
-    installationID            = var.version_control_system_github_application_installation_id
-    githubApiURL              = var.version_control_system_github_url != "github.com" ? "https://api.${var.version_control_system_github_url}" : ""
-  }
+  keda_meta_data_github = merge(
+    var.version_control_system_authentication_method == "pat" ? {
+      owner                     = var.version_control_system_organization
+      repos                     = var.version_control_system_repository
+      targetWorkflowQueueLength = var.version_control_system_agent_target_queue_length
+      runnerScope               = var.version_control_system_runner_scope
+      githubApiURL              = var.version_control_system_github_url != "github.com" ? "https://api.${var.version_control_system_github_url}" : ""
+      } : {
+      owner                     = var.version_control_system_organization
+      repos                     = var.version_control_system_repository
+      targetWorkflowQueueLength = var.version_control_system_agent_target_queue_length
+      runnerScope               = var.version_control_system_runner_scope
+      applicationID             = var.version_control_system_github_application_id
+      installationID            = var.version_control_system_github_application_installation_id
+      githubApiURL              = var.version_control_system_github_url != "github.com" ? "https://api.${var.version_control_system_github_url}" : ""
+    },
+    length(var.version_control_system_runner_labels) > 0 ? { labels = join(",", var.version_control_system_runner_labels) } : {},
+    var.version_control_system_runner_no_default_labels ? { noDefaultLabels = "true" } : {},
+  )
 }
 
 locals {
-  environment_variables       = concat(tolist(jsondecode(local.environment_variables_final)), tolist(var.container_app_environment_variables))
+  environment_variables       = concat(tolist(jsondecode(local.environment_variables_final)), local.environment_variables_runner_labels, tolist(var.container_app_environment_variables))
   environment_variables_final = var.version_control_system_type == "azuredevops" ? jsonencode(local.environment_variables_azure_devops) : jsonencode(local.environment_variables_github)
+
+  environment_variables_runner_labels = var.version_control_system_type == "github" ? concat(
+    length(var.version_control_system_runner_labels) > 0 ? [{ name = "LABELS", value = join(",", var.version_control_system_runner_labels) }] : [],
+    var.version_control_system_runner_no_default_labels ? [{ name = "NO_DEFAULT_LABELS", value = "true" }] : [],
+  ) : []
 
   environment_variables_azure_devops = [
     { name = "AZP_POOL", value = var.version_control_system_pool_name },
