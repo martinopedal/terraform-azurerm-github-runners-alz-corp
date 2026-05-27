@@ -98,7 +98,7 @@ module "github_runners" {
 - Subnet for the Storage Account private endpoint (can reuse the ACR PE subnet).
 - Private DNS zone `privatelink.queue.core.windows.net` (or central DNS / Azure Policy).
 - A webhook receiver with a managed identity. The module grants it `Storage Queue Data Message Sender` on the queue.
-- `storage_use_azuread = true` on the `azurerm` provider block. The Storage Account is created with `shared_access_key_enabled = false` and the AVM submodule's queue resource talks Storage data-plane during apply — without this flag the provider falls back to shared-key auth and the apply fails with `KeyBasedAuthenticationNotPermitted`. See [WEBHOOKS.md](./WEBHOOKS.md#caller-prerequisites-required-when-webhook_scaling_enabled--true) for the full prereq list including the data-plane RBAC role.
+- `storage_use_azuread = true` on the `azurerm` provider block. The Storage Account is created with `shared_access_key_enabled = false` and the AVM submodule's queue resource talks Storage data-plane during apply - without this flag the provider falls back to shared-key auth and the apply fails with `KeyBasedAuthenticationNotPermitted`. See [WEBHOOKS.md](./WEBHOOKS.md#caller-prerequisites-required-when-webhook_scaling_enabled--true) for the full prereq list including the data-plane RBAC role.
 
 **Receiver contract:** see [WEBHOOKS.md](./WEBHOOKS.md) for payload shape, idempotency rules, and a sample Azure Function.
 
@@ -383,7 +383,7 @@ This module exposes two inputs:
 | `version_control_system_runner_labels` | `list(string)` | `[]` | Extra labels added to the runner at registration. Also forwarded to the KEDA `github-runner` scaler so polling mode scales the right pool. |
 | `version_control_system_runner_no_default_labels` | `bool` | `false` | Pass `--no-default-labels` to the runner. The defaults `self-hosted`/`Linux`/`X64` are dropped; only `version_control_system_runner_labels` remain. |
 
-Both inputs are GitHub-only — setting them with `version_control_system_type = "azuredevops"` fails validation. Azure DevOps uses pools and demands instead.
+Both inputs are GitHub-only - setting them with `version_control_system_type = "azuredevops"` fails validation. Azure DevOps uses pools and demands instead.
 
 Example: a dedicated runner pool for a single repo with its own label:
 
@@ -414,9 +414,9 @@ jobs:
     runs-on: [self-hosted, team-a]
 ```
 
-**Webhook mode note:** when `webhook_scaling_enabled = true` the KEDA scaler is `azure-queue` and ignores GitHub labels — scaling is driven entirely by the Storage Queue. The labels are still applied at runner registration, so `runs-on` matching still works as expected.
+**Webhook mode note:** when `webhook_scaling_enabled = true` the KEDA scaler is `azure-queue` and ignores GitHub labels - scaling is driven entirely by the Storage Queue. The labels are still applied at runner registration, so `runs-on` matching still works as expected.
 
-**Reserved env var names:** do not pass `LABELS` or `NO_DEFAULT_LABELS` via `container_app_environment_variables` when using these inputs — Azure Container Apps rejects duplicate environment variable names.
+**Reserved env var names:** do not pass `LABELS` or `NO_DEFAULT_LABELS` via `container_app_environment_variables` when using these inputs - Azure Container Apps rejects duplicate environment variable names.
 
 ---
 
