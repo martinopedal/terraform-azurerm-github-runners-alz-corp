@@ -44,6 +44,25 @@ GitHub.com / Azure DevOps
 
 ---
 
+## Caller prerequisites (required when `webhook_scaling_enabled = true`)
+
+The storage account this module provisions has `shared_access_key_enabled = false` (AAD-only data plane). All three of the following must be true on the side that runs `terraform apply`, or the apply will fail when it tries to create the queue:
+
+1. **Provider configuration: `storage_use_azuread = true`**
+   ```hcl
+   provider "azurerm" {
+     features {}
+     storage_use_azuread = true
+   }
+   ```
+   Without this, the azurerm provider tries to read queue properties via the shared-key data-plane API and gets `403 AuthorizationFailure` / `KeyBasedAuthenticationNotPermitted` on an AAD-only account. This module cannot set provider config on your behalf - provider blocks belong to the root module.
+
+2. **Deployment identity has data-plane RBAC on the storage account.** The principal running Terraform needs `Storage Queue Data Contributor` (or higher) on the storage account scope, in addition to its usual control-plane role. ARM `Contributor` / `Owner` alone is not enough for data-plane queue operations.
+
+3. **Network reachability to the queue private endpoint.** The storage account has `public_network_access_enabled = false`. Your Terraform runner (self-hosted agent, ACA build job, Cloud Shell from a peered VNet, etc.) must be able to resolve `<account>.privatelink.queue.core.windows.net` and reach it over the private network. A Microsoft-hosted runner with no private connectivity cannot complete the apply.
+
+---
+
 ## What this module creates when `webhook_scaling_enabled = true`
 
 | Resource | Notes |
@@ -68,7 +87,7 @@ The receiver MUST do all of:
 
 1. **Validate the webhook signature.** For GitHub: HMAC-SHA256 of the raw body with the webhook secret, compared against `X-Hub-Signature-256`. For Azure DevOps: shared-secret basic auth on the service hook subscription.
 2. **Filter events.** Only `workflow_job` with `action = "queued"` (GitHub) or `ms.vss-pipelines.run-state-changed-event` with state `inProgress` (Azure DevOps). Ignore everything else.
-3. **Filter by runner labels or pool name (MUST, not SHOULD).** A receiver that scales on every `self-hosted` job will spawn runners for jobs that belong to unrelated pools in the same org. Match the full label set you registered (e.g. `["self-hosted","linux","alz-corp"]`) or a unique label you assign per pool. For AzDO, filter on the exact pool name.
+3. **Filter by runner labels or pool name (MUST, not SHOULD).** A receiver that scales on every `self-hosted` job will spawn runners for jobs that belong to unrelated pools in the same org. Match the full label set you registered via `version_control_system_runner_labels` (e.g. `["self-hosted","linux","alz-corp"]`) or a unique label you assign per pool. For AzDO, filter on the exact pool name.
 4. **Deduplicate.** GitHub redelivers webhooks; receivers (Function App / APIM) can also retry. Build a dedupe key from `{provider, repo_or_org, run_id, job_id, run_attempt}` and short-circuit duplicates for a window longer than your message TTL. Without this you will over-scale during webhook storms or transient receiver failures.
 5. **Send one queue message per **deduped** queued job.** Body can be anything (KEDA only looks at queue length); a small JSON with `run_id` / `job_id` / `attempt` is useful for tracing.
 6. **Set an appropriate message TTL.** Messages exist only to bump queue depth so KEDA scales; the runner does not consume them. **Default 300 s** is a safe starting point that absorbs cold-start, image pull, firewall/DNS variability, and ACA scheduling latency. Tune down to `120-180s` only after measuring your env's p95 cold-start; tune up if you see KEDA scaling and the runner failing to claim the job in time.
