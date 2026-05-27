@@ -23,7 +23,7 @@ Pin consumers to the release tag so runner bootstrap behavior is reproducible:
 
 ```hcl
 module "corp_runners" {
-  source = "github.com/martinopedal/terraform-azurerm-github-runners-alz-corp?ref=v0.1.0"
+  source = "github.com/martinopedal/terraform-azurerm-github-runners-alz-corp?ref=v1.0.0"
 
   # ...
 }
@@ -33,7 +33,7 @@ Minimal example: GitHub runners with PAT auth in an ALZ Corp subscription.
 
 ```hcl
 module "github_runners" {
-  source = "github.com/martinopedal/terraform-azurerm-github-runners-alz-corp?ref=v0.1.0"
+  source = "github.com/martinopedal/terraform-azurerm-github-runners-alz-corp?ref=v1.0.0"
 
   postfix  = "ghrun"
   location = "swedencentral"
@@ -71,7 +71,7 @@ For sub-second scale-up with **no GitHub/AzDO API polling**, enable webhook mode
 
 ```hcl
 module "github_runners" {
-  source = "github.com/martinopedal/terraform-azurerm-github-runners-alz-corp?ref=v0.1.0"
+  source = "github.com/martinopedal/terraform-azurerm-github-runners-alz-corp?ref=v1.0.0"
 
   postfix  = "ghrun"
   location = "swedencentral"
@@ -257,7 +257,7 @@ flowchart TB
 
 ```hcl
 module "github_runners" {
-  source = "github.com/martinopedal/terraform-azurerm-github-runners-alz-corp?ref=v0.1.0"
+  source = "github.com/martinopedal/terraform-azurerm-github-runners-alz-corp?ref=v1.0.0"
 
   postfix  = "ghrun"
   location = "swedencentral"
@@ -293,7 +293,7 @@ jobs:
 
 ```hcl
 module "azuredevops_agents" {
-  source = "github.com/martinopedal/terraform-azurerm-github-runners-alz-corp?ref=v0.1.0"
+  source = "github.com/martinopedal/terraform-azurerm-github-runners-alz-corp?ref=v1.0.0"
 
   postfix  = "adoagt"
   location = "swedencentral"
@@ -322,7 +322,7 @@ module "azuredevops_agents" {
 
 ```hcl
 module "github_runners" {
-  source = "github.com/martinopedal/terraform-azurerm-github-runners-alz-corp?ref=v0.1.0"
+  source = "github.com/martinopedal/terraform-azurerm-github-runners-alz-corp?ref=v1.0.0"
 
   postfix  = "ghapp"
   location = "swedencentral"
@@ -403,7 +403,7 @@ Set `runner_acr_push_enabled = true` to grant the runner UAMI `AcrPush` on the r
 
 ```hcl
 module "runners" {
-  source = "github.com/martinopedal/terraform-azurerm-github-runners-alz-corp?ref=v0.1.0"
+  source = "github.com/martinopedal/terraform-azurerm-github-runners-alz-corp?ref=v1.0.0"
 
   # ... your existing inputs ...
   runner_acr_push_enabled = true

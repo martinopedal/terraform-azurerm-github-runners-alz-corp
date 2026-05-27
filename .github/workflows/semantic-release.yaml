@@ -1,0 +1,72 @@
+name: Semantic version tag
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  tag:
+    name: Conventional commit tag
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          fetch-depth: 0
+
+      - name: Create next semantic tag
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --tags --force
+          latest_tag=$(git tag -l 'v[0-9]*.[0-9]*.[0-9]*' --sort=-v:refname | head -n 1)
+          if [[ -z "$latest_tag" ]]; then
+            latest_tag="v0.0.0"
+            range="HEAD"
+          else
+            range="$latest_tag..HEAD"
+          fi
+
+          messages=$(git log --format=%B $range)
+          if [[ -z "${messages//[[:space:]]/}" ]]; then
+            echo "No commits since $latest_tag."
+            exit 0
+          fi
+
+          bump="none"
+          if grep -Eq '(^[a-zA-Z]+(\(.+\))?!:|BREAKING CHANGE:)' <<< "$messages"; then
+            bump="major"
+          elif grep -Eq '^feat(\(.+\))?:' <<< "$messages"; then
+            bump="minor"
+          elif grep -Eq '^(fix|perf|revert)(\(.+\))?:' <<< "$messages"; then
+            bump="patch"
+          fi
+
+          if [[ "$bump" == "none" ]]; then
+            echo "No releasable conventional commits found."
+            exit 0
+          fi
+
+          version="${latest_tag#v}"
+          IFS='.' read -r major minor patch <<< "$version"
+          case "$bump" in
+            major) major=$((major + 1)); minor=0; patch=0 ;;
+            minor) minor=$((minor + 1)); patch=0 ;;
+            patch) patch=$((patch + 1)) ;;
+          esac
+          next_tag="v${major}.${minor}.${patch}"
+
+          if git rev-parse "$next_tag" >/dev/null 2>&1; then
+            echo "$next_tag already exists."
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "$next_tag" -m "$next_tag"
+          git push origin "$next_tag"
+          echo "Created $next_tag from $latest_tag using $bump bump."
