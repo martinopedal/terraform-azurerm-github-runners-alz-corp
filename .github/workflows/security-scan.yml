@@ -15,7 +15,7 @@ permissions:
 jobs:
   checkov:
     name: Checkov
-    runs-on: [self-hosted, personal-linux]
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
@@ -39,7 +39,7 @@ jobs:
 
   tflint:
     name: TFLint
-    runs-on: [self-hosted, personal-linux]
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
@@ -47,7 +47,7 @@ jobs:
       - name: Setup TFLint
         uses: terraform-linters/setup-tflint@b480b8fcdaa6f2c577f8e4fa799e89e756bb7c93  # v6.2.2
         with:
-          tflint_version: latest
+          tflint_version: v0.62.0
 
       - name: Init TFLint
         run: tflint --init
@@ -57,7 +57,7 @@ jobs:
 
   trivy:
     name: Trivy IaC Scan
-    runs-on: [self-hosted, personal-linux]
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
