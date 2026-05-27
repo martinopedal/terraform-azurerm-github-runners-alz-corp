@@ -50,6 +50,32 @@ module "github_runners" {
 }
 ```
 
+### Custom runner labels
+
+To register runners with specific labels (e.g., for org-level enrollment), set `runner_labels`:
+
+```hcl
+module "github_runners" {
+  source = "github.com/martinopedal/terraform-azurerm-github-runners-alz-corp?ref=v1.1.0"
+
+  postfix  = "ghrun"
+  location = "swedencentral"
+
+  # Subnets from ALZ Vending Module
+  container_app_subnet_id                      = module.lz_vending.subnets["aca"].id
+  container_registry_private_endpoint_subnet_id = module.lz_vending.subnets["pe"].id
+
+  # GitHub
+  version_control_system_type                  = "github"
+  version_control_system_organization          = "my-org"
+  version_control_system_repository            = "my-repo"
+  version_control_system_personal_access_token = var.github_pat
+
+  # Custom labels injected as RUNNER_LABELS env var
+  runner_labels = ["self-hosted", "alz-a1", "linux", "x64"]
+}
+```
+
 Then reference the runner in your workflow:
 
 ```yaml

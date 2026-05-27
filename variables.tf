@@ -106,3 +106,9 @@ variable "use_zone_redundancy" {
   }
 }
 
+variable "runner_labels" {
+  type        = list(string)
+  default     = []
+  description = "Optional list of runner labels to inject as the RUNNER_LABELS environment variable (comma-joined). Empty list = omit the env var, preserving v1.0.x default label behavior."
+}
+

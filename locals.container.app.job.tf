@@ -39,7 +39,7 @@ locals {
     { name = "AZP_AGENT_NAME_PREFIX", value = local.version_control_system_agent_name_prefix }
   ]
 
-  environment_variables_github = var.version_control_system_authentication_method == "pat" ? [
+  environment_variables_github = var.version_control_system_authentication_method == "pat" ? concat([
     { name = "RUNNER_NAME_PREFIX", value = local.version_control_system_agent_name_prefix },
     { name = "REPO_URL", value = local.github_repository_url },
     { name = "RUNNER_SCOPE", value = var.version_control_system_runner_scope },
@@ -48,7 +48,9 @@ locals {
     { name = "ENTERPRISE_NAME", value = var.version_control_system_enterprise },
     { name = "RUNNER_GROUP", value = var.version_control_system_runner_group },
     { name = "GITHUB_HOST", value = var.version_control_system_github_url }
-    ] : [
+    ], length(var.runner_labels) > 0 ? [
+    { name = "RUNNER_LABELS", value = join(",", var.runner_labels) }
+    ] : []) : concat([
     { name = "RUNNER_NAME_PREFIX", value = local.version_control_system_agent_name_prefix },
     { name = "REPO_URL", value = local.github_repository_url },
     { name = "RUNNER_SCOPE", value = var.version_control_system_runner_scope },
@@ -58,7 +60,9 @@ locals {
     { name = "RUNNER_GROUP", value = var.version_control_system_runner_group },
     { name = "APP_ID", value = var.version_control_system_github_application_id },
     { name = "GITHUB_HOST", value = var.version_control_system_github_url }
-  ]
+    ], length(var.runner_labels) > 0 ? [
+    { name = "RUNNER_LABELS", value = join(",", var.runner_labels) }
+  ] : [])
 }
 
 locals {
