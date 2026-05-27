@@ -385,7 +385,7 @@ Azure Container Apps Jobs run in a sandboxed environment that does not allow pri
 
 ### Pushing images to the private ACR
 
-The container registry created by this module has `publicNetworkAccess = Disabled` and is reachable only via the Private Endpoint inside your VNet. The platform module stops there — choosing a build pattern (dedicated ACR agent pool, in-runner Buildah, etc.) is a workflow concern handled separately.
+The container registry created by this module has `publicNetworkAccess = Disabled` and is reachable only via the Private Endpoint inside your VNet. The platform module stops there. Choosing a build pattern (dedicated ACR agent pool, in-runner Buildah, etc.) is a workflow concern handled separately.
 
 Set `runner_acr_push_enabled = true` to grant the runner UAMI `AcrPush` on the registry, then wire the cookbook submodule alongside this module. The submodule follows the AVM Resource Module specification: you create the subnet, the module consumes it.
 
@@ -950,7 +950,7 @@ Description: Whether to grant the runner User Assigned Managed Identity AcrPush 
 
 Default is `false` (least privilege): the runner gets AcrPull only, which is enough to start runner pods and pull the runner image.
 
-Set to `true` when your workflows need to push images. The platform module does not pick a build pattern — pair this opt-in with one of the recipes in the [companion cookbook](https://github.com/martinopedal/github-runners-alz-corp-cookbook) (TF submodule for an ACR agent pool, or a custom runner image with Buildah/Kaniko).
+Set to `true` when your workflows need to push images. The platform module does not pick a build pattern. Pair this opt-in with one of the recipes in the [companion cookbook](https://github.com/martinopedal/github-runners-alz-corp-cookbook) (TF submodule for an ACR agent pool, or a custom runner image with Buildah/Kaniko).
 
 Has no effect when `container_registry_creation_enabled = false`.
 

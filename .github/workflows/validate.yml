@@ -12,7 +12,7 @@ permissions:
 jobs:
   terraform:
     name: Terraform Validate
-    runs-on: [self-hosted, personal-linux]
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
@@ -20,7 +20,7 @@ jobs:
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@5e8dbf3c6d9deaf4193ca7a8fb23f2ac83bb6c85  # v4.0.0
         with:
-          terraform_version: "~1.9"
+          terraform_version: 1.13.1
 
       - name: Terraform Init
         run: terraform init -backend=false
@@ -33,7 +33,7 @@ jobs:
 
   style:
     name: Style Check
-    runs-on: [self-hosted, personal-linux]
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
