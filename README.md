@@ -950,7 +950,7 @@ Description: Whether to grant the runner User Assigned Managed Identity AcrPush 
 
 Default is `false` (least privilege): the runner gets AcrPull only, which is enough to start runner pods and pull the runner image.
 
-Set to `true` when your workflows need to push images. The platform module does not pick a build pattern — pair this opt-in with one of the recipes in the [companion cookbook](https://github.com/martinopedal/github-runners-alz-corp-cookbook) (TF submodule for an ACR agent pool, or a custom runner image with Buildah/Kaniko).
+Set to `true` when your workflows need to push images. The platform module does not pick a build pattern. Pair this opt-in with one of the recipes in the [companion cookbook](https://github.com/martinopedal/github-runners-alz-corp-cookbook) (TF submodule for an ACR agent pool, or a custom runner image with Buildah/Kaniko).
 
 Has no effect when `container_registry_creation_enabled = false`.
 
