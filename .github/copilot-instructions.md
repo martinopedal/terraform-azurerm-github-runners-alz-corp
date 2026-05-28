@@ -15,7 +15,17 @@ applyTo: '**/*.tf, **/*.tfvars, **/*.md'
 | `github.com/martinopedal/terraform-azurerm-github-runners-alz-corp` | Linux ACA runners in ALZ Corp subscriptions (alz-prod pool-a1) | `?ref=vX.Y.Z` (tag) |
 | `Azure/avm-ptn-cicd-agents-and-runners/azurerm` v0.5.1+ | Linux ACA runners in non-ALZ subscriptions (personal-runners-infra) | `version = "0.5.1"` (registry pin) |
 
-**No raw `azurerm_container_app_job` / `azurerm_linux_virtual_machine_scale_set` declarations in consumer repos** - everything goes through a module. The canonical module accepts BYO RG / CAE / UAMI / LAW / ACR / subnets via the documented escape hatches.
+**Consumer repos are thin.** A consumer repo is `main.tf` + `variables.tf` + `terraform.tfvars` (+ backend config + provider config). Nothing else. Specifically:
+
+- ✅ `module "runners" { source = "<one-of-the-three>"; ... }` with inputs wired from variables / data sources / outputs of the ALZ Vending module
+- ✅ `data` blocks to look up existing BYO infrastructure (RG, CAE, UAMI, LAW, ACR, KV, subnets) to pass into the module
+- ✅ `terraform`, `provider`, `backend` blocks
+- ❌ No `resource "azurerm_container_app_job"` / `resource "azurerm_linux_virtual_machine_scale_set"` / `resource "azapi_resource" "job"` - the module owns these
+- ❌ No `azapi_update_resource` patches against live module-owned resources - if the module is missing a field, PR the module
+- ❌ No `null_resource` / `local-exec` workarounds against the runner Job/VMSS - same rule, PR the module
+- ❌ No orchestration scripts that mutate runner state out-of-band
+
+If the canonical module doesn't expose what a consumer needs, **open an issue/PR against the module** (this repo for ACA-ALZ, the VMSS repo for Windows, upstream Azure org for public AVM). Do NOT work around it in the consumer.
 
 **Forks that exist purely to consume must be archived.** As of 2026-05-28 the following are deprecated and slated for archival:
 - `martinopedal/terraform-azurerm-avm-ptn-cicd-agents-and-runners-personal` - replaced by public AVM v0.5.1
