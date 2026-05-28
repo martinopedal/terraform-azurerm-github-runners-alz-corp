@@ -5,6 +5,30 @@ applyTo: '**/*.tf, **/*.tfvars, **/*.md'
 
 # Copilot Instructions - terraform-azurerm-github-runners-alz-corp
 
+## CANONICAL MODULES - DIRECTIVE (2026-05-28)
+
+**Only THREE modules are consumed to deploy runner infrastructure across the alz-avm-tf-demo + martinopedal ecosystem.** Any other source URL in a consumer repo is a bug that must be migrated to one of these:
+
+| Module | Use for | Pin format |
+|---|---|---|
+| `github.com/martinopedal/terraform-azurerm-vmss-github-runners-windows` | Windows VMSS runners (alz-prod pool-w-org) | `?ref=vX.Y.Z` (tag) |
+| `github.com/martinopedal/terraform-azurerm-github-runners-alz-corp` | Linux ACA runners in ALZ Corp subscriptions (alz-prod pool-a1) | `?ref=vX.Y.Z` (tag) |
+| `Azure/avm-ptn-cicd-agents-and-runners/azurerm` v0.5.1+ | Linux ACA runners in non-ALZ subscriptions (personal-runners-infra) | `version = "0.5.1"` (registry pin) |
+
+**No raw `azurerm_container_app_job` / `azurerm_linux_virtual_machine_scale_set` declarations in consumer repos** - everything goes through a module. The canonical module accepts BYO RG / CAE / UAMI / LAW / ACR / subnets via the documented escape hatches.
+
+**Forks that exist purely to consume must be archived.** As of 2026-05-28 the following are deprecated and slated for archival:
+- `martinopedal/terraform-azurerm-avm-ptn-cicd-agents-and-runners-personal` - replaced by public AVM v0.5.1
+- `alz-avm-tf-demo/terraform-azurerm-github-runners-alz-corp` (already archived 2026-05-28 - zero consumers)
+- `alz-avm-tf-demo/alz-aca-runners` - replaced by direct module consumption from alz-prod
+
+**Consumer mapping (authoritative as of 2026-05-28):**
+- `alz-avm-tf-demo/alz-prod/infra/pool-a1` → `martinopedal/terraform-azurerm-github-runners-alz-corp` (Linux ACA)
+- `alz-avm-tf-demo/alz-prod/infra/pool-w-org` → `martinopedal/terraform-azurerm-vmss-github-runners-windows` (Windows VMSS)
+- `martinopedal/personal-runners-infra` → `Azure/avm-ptn-cicd-agents-and-runners/azurerm` (public registry)
+
+Pin versions explicitly. No `?ref=main`. No `version = "~> 0"`.
+
 ## What This Module Is
 
 This is a Terraform module that deploys self-hosted **GitHub Actions Runners** and **Azure DevOps Agents** on **Azure Container Apps (ACA)** in an **Azure Landing Zone Corp** subscription.
