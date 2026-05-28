@@ -185,6 +185,24 @@ DESCRIPTION
   }
 }
 
+variable "version_control_system_keda_enable_etags" {
+  type        = bool
+  default     = false
+  description = <<DESCRIPTION
+When true, sets `enableEtags = "true"` on the KEDA `github-runner` scaler so the scaler uses HTTP ETag conditional requests when polling the GitHub API, reducing API consumption when nothing has changed since the previous poll. Requires KEDA >= 2.17. **GitHub only.**
+DESCRIPTION
+  nullable    = false
+
+  validation {
+    condition = (
+      var.version_control_system_type == "azuredevops"
+      ? var.version_control_system_keda_enable_etags == false
+      : true
+    )
+    error_message = "version_control_system_keda_enable_etags is GitHub-only."
+  }
+}
+
 variable "runner_visibility" {
   type        = string
   default     = "private"
