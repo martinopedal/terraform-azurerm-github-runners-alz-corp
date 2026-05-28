@@ -122,6 +122,30 @@ DESCRIPTION
 
   validation {
     condition = (
+      var.version_control_system_type == "github" && var.runner_visibility == "private"
+      ? anytrue([
+        for l in var.version_control_system_runner_labels :
+        contains(["alz-a1", "alz-p1", "alz-corp", "private-runner"], lower(l))
+      ])
+      : true
+    )
+    error_message = "When runner_visibility = 'private', version_control_system_runner_labels MUST include one of: 'alz-a1', 'alz-p1', 'alz-corp', 'private-runner'. This prevents public-repo workflows from accidentally landing on a corp-network-attached pool. See variable docs for runner_visibility."
+  }
+
+  validation {
+    condition = (
+      var.version_control_system_type == "github" && var.runner_visibility == "public"
+      ? anytrue([
+        for l in var.version_control_system_runner_labels :
+        lower(l) == "public-runner" || startswith(lower(l), "pub-") || lower(l) == "pub"
+      ])
+      : true
+    )
+    error_message = "When runner_visibility = 'public', version_control_system_runner_labels MUST include 'public-runner', 'pub', or a label starting with 'pub-'. This forces explicit opt-in for any workflow targeting the public pool and keeps public/private label sets non-overlapping."
+  }
+
+  validation {
+    condition = (
       var.version_control_system_type == "azuredevops"
       ? length(var.version_control_system_runner_labels) == 0
       : true
@@ -158,6 +182,42 @@ DESCRIPTION
       : true
     )
     error_message = "version_control_system_runner_no_default_labels is GitHub-only."
+  }
+}
+
+variable "runner_visibility" {
+  type        = string
+  default     = "private"
+  description = <<DESCRIPTION
+The trust boundary this runner pool operates under. **GitHub only.** Hard-isolates pools
+intended for private (corp-network-attached) workloads from pools intended for public
+workloads (forks, external contributors).
+
+- `private` - pool is attached to the ALZ corp VNet, can reach private endpoints (state SAs, KV).
+  Labels MUST include one of: `alz-a1`, `alz-p1`, `alz-corp`, or `private-runner` so consumer
+  workflows in private repos can target it explicitly and cannot accidentally land on a public pool.
+- `public`  - pool is isolated, has NO ALZ corp network access, NO access to corp KV/state.
+  Labels MUST include `public-runner` or a `pub-*` prefix. Use this for pools that service
+  public repos / fork PRs where workflow code is untrusted.
+
+This is enforced at plan time by validation on `version_control_system_runner_labels` below.
+Mixing public and private workloads on the same pool is a network/credential exposure risk -
+keep them on separate module deployments with different visibility values.
+DESCRIPTION
+  nullable    = false
+
+  validation {
+    condition     = contains(["private", "public"], var.runner_visibility)
+    error_message = "runner_visibility must be 'private' or 'public'."
+  }
+
+  validation {
+    condition = (
+      var.version_control_system_type == "azuredevops"
+      ? var.runner_visibility == "private"
+      : true
+    )
+    error_message = "runner_visibility is GitHub-only. Azure DevOps deployments must leave it at the default 'private'."
   }
 }
 
