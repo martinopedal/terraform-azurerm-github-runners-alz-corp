@@ -15,14 +15,15 @@ applyTo: '**/*.tf, **/*.tfvars, **/*.md'
 | `github.com/martinopedal/terraform-azurerm-github-runners-alz-corp` | Linux ACA runners in ALZ Corp subscriptions (alz-prod pool-a1) | `?ref=vX.Y.Z` (tag) |
 | `Azure/avm-ptn-cicd-agents-and-runners/azurerm` v0.5.1+ | Linux ACA runners in non-ALZ subscriptions (personal-runners-infra) | `version = "0.5.1"` (registry pin) |
 
-**Consumer repos are thin.** A consumer repo is `main.tf` + `variables.tf` + `terraform.tfvars` (+ backend config + provider config). Nothing else. Specifically:
+**Consumer repos consume the canonical module — they don't redeclare what the module owns.** A consumer repo legitimately needs everything required to call a module cleanly: `main.tf` (module block + provider/backend), `variables.tf`, `terraform.tfvars`, `data.tf` (BYO lookups), `outputs.tf`, plus workflows, READMEs, scripts, etc. What it does NOT need is raw declarations of resources the module already creates.
 
 - ✅ `module "runners" { source = "<one-of-the-three>"; ... }` with inputs wired from variables / data sources / outputs of the ALZ Vending module
 - ✅ `data` blocks to look up existing BYO infrastructure (RG, CAE, UAMI, LAW, ACR, KV, subnets) to pass into the module
 - ✅ `terraform`, `provider`, `backend` blocks
-- ❌ No `resource "azurerm_container_app_job"` / `resource "azurerm_linux_virtual_machine_scale_set"` / `resource "azapi_resource" "job"` - the module owns these
-- ❌ No `azapi_update_resource` patches against live module-owned resources - if the module is missing a field, PR the module
-- ❌ No `null_resource` / `local-exec` workarounds against the runner Job/VMSS - same rule, PR the module
+- ✅ Supporting infra the module is intentionally NOT responsible for (spoke VNet/NSG/UDR before the ALZ Vending module took over, custom monitoring stack, KV with App secrets, ACR-specific config)
+- ❌ No `resource "azurerm_container_app_job"` / `resource "azurerm_linux_virtual_machine_scale_set"` / `resource "azapi_resource" "job"` for the runner Job/VMSS itself — the module owns these
+- ❌ No `azapi_update_resource` patches against live module-owned resources — if the module is missing a field, PR the module
+- ❌ No `null_resource` / `local-exec` workarounds against the runner Job/VMSS — same rule, PR the module
 - ❌ No orchestration scripts that mutate runner state out-of-band
 
 If the canonical module doesn't expose what a consumer needs, **open an issue/PR against the module** (this repo for ACA-ALZ, the VMSS repo for Windows, upstream Azure org for public AVM). Do NOT work around it in the consumer.
