@@ -21,7 +21,17 @@ applyTo: '**/*.tf, **/*.tfvars, **/*.md'
 **Why #4 exists (so future-you doesn't ask again):**
 - The personal estate (sub-5) needs NAT Gateway + public IP egress, which upstream #3 supports but personal-runners-infra leans on heavily.
 - Personal fork adds: `log_analytics_workspace_resource_id` BYO input for CAE appLogsConfiguration (upstream creates LAW internally with fragile sharedKeys ordering), and 3 KEDA inputs (`version_control_system_keda_labels`, `_no_default_labels`, `_enable_etags`) for label-aware scaling.
-- These are tracked as upstream PRs to `Azure/terraform-azurerm-avm-ptn-cicd-agents-and-runners`. When merged + released, #4 retires and personal-runners-infra moves to #3.
+- **Forks are permanent canonicals.** Upstream PR branches exist (`feat/byo-log-analytics-workspace-resource-id`, `feat/keda-parity-inputs` on `martinopedal/terraform-azurerm-avm-ptn-cicd-agents-and-runners`) and may be opened later, but #4 is not on a retirement path. If upstream ever catches up, migration is optional, not required.
+
+### Estate → module quick-lookup
+
+| Estate | Linux ACA runners | Windows VMSS runners |
+|---|---|---|
+| **Personal (sub-5)** | **#4** (personal fork) | **#1** |
+| **ALZ Corp (sub-1)** | **#2** (alz-corp module) | **#1** |
+| **Any vanilla future consumer** | **#3** (public AVM) | **#1** |
+
+One Windows module covers all estates. Three Linux modules because the shape differs (vanilla / ALZ-corp / personal-with-NAT).
 
 ### Consumer rules
 
