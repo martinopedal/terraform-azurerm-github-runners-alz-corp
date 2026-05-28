@@ -5,6 +5,68 @@ applyTo: '**/*.tf, **/*.tfvars, **/*.md'
 
 # Copilot Instructions - terraform-azurerm-github-runners-alz-corp
 
+## CANONICAL MODULES - DIRECTIVE (2026-05-28)
+
+**Runner infrastructure is deployed by consuming a canonical module. Raw `resource` declarations for runner Jobs / VMSS in consumer repos are forbidden.** Forks are allowed where they carry features not yet upstream - they are documented below with the exact upstream gap.
+
+### Canonical modules
+
+| # | Module | Use for | Pin |
+|---|---|---|---|
+| 1 | `github.com/martinopedal/terraform-azurerm-vmss-github-runners-windows` | Windows VMSS runners (all estates: sub-1 pool-w-org, sub-5 personal Windows) | `?ref=vX.Y.Z` |
+| 2 | `github.com/martinopedal/terraform-azurerm-github-runners-alz-corp` | Linux ACA runners in ALZ Corp subscriptions (sub-1 pool-a1, pool-b-pub). Central firewall egress, org-scoped runners. | `?ref=vX.Y.Z` |
+| 3 | `github.com/martinopedal/terraform-azurerm-avm-ptn-cicd-agents-and-runners-personal` | Linux ACA runners in personal estate (sub-5). Fork of `Azure/avm-ptn-cicd-agents-and-runners` carrying NAT GW retention, BYO LAW for CAE, and KEDA label parity. | `?ref=v0.6.0-personal.N` |
+
+**The public `Azure/avm-ptn-cicd-agents-and-runners/azurerm` module is not on the canonical list.** Every real estate has an estate-specific fork (#2 for ALZ Corp, #3 for personal), so the vanilla AVM is never consumed directly. If a brand-new estate with no fork-specific needs appears, evaluate then; until then, don't reach for it.
+
+**Why #3 (personal fork) exists - permanent justification:**
+- Personal estate (sub-5) needs NAT Gateway + public IP egress (vs. ALZ Corp's central firewall).
+- Personal fork carries: `log_analytics_workspace_resource_id` BYO input for CAE appLogsConfiguration (upstream creates LAW internally with fragile sharedKeys ordering), and 3 KEDA inputs (`version_control_system_keda_labels`, `_no_default_labels`, `_enable_etags`) for label-aware scaling.
+- **Forks are permanent canonicals.** Upstream PR branches exist (`feat/byo-log-analytics-workspace-resource-id`, `feat/keda-parity-inputs` on `martinopedal/terraform-azurerm-avm-ptn-cicd-agents-and-runners`) and may be opened later, but #3 is not on a retirement path. Migration to the public AVM is optional, not required, even if upstream catches up.
+
+### Estate -> module quick-lookup
+
+| Estate | Linux ACA runners | Windows VMSS runners |
+|---|---|---|
+| **Personal (sub-5)** | **#3** (personal fork) | **#1** |
+| **ALZ Corp (sub-1)** | **#2** (alz-corp module) | **#1** |
+
+One Windows module covers all estates. Two Linux modules because the network shape differs (ALZ Corp central firewall vs. personal NAT GW).
+
+### Consumer rules
+
+**A consumer repo consumes a canonical module - it does not redeclare what the module owns.** Consumer repos legitimately need: `main.tf` (module block + provider/backend), `variables.tf`, `terraform.tfvars`, `data.tf` (BYO lookups), `outputs.tf`, plus workflows, READMEs, scripts. They do NOT need raw runner Job / VMSS resources.
+
+- ✅ `module "runners" { source = "<one-of-the-three>"; ... }`
+- ✅ `data` blocks for BYO RG/CAE/UAMI/LAW/ACR/KV/subnets
+- ✅ `terraform`, `provider`, `backend` blocks
+- ✅ Supporting infra the module is intentionally NOT responsible for (spoke networking before ALZ Vending, custom monitoring, KV with App secrets, ACR-specific config)
+- ❌ No `resource "azurerm_container_app_job"` / `azapi_resource "job"` / `azurerm_linux_virtual_machine_scale_set` for the runner Job/VMSS itself
+- ❌ No `azapi_update_resource` patches against live module-owned resources - if the module is missing a field, PR the module (or its fork)
+- ❌ No `null_resource` / `local-exec` workarounds against the runner Job/VMSS - same rule
+- ❌ No orchestration scripts that mutate runner state out-of-band
+- ❌ No raw `Azure/avm-res-compute-virtualmachinescaleset/azurerm` for runner VMSS - use canonical #1; it wraps the AVM compute module with runner-specific glue (DSC bootstrap, KV, RBAC, GitHub registration)
+
+### Compliance status (audited 2026-05-28)
+
+| Pool | Repo | Status | Action |
+|---|---|---|---|
+| `caj-a1-runner` | alz-prod/infra/pool-a1 | ❌ raw `azurerm_container_app_job` | Refactor to #2 (HIGH risk - azurerm->azapi provider mismatch, needs state surgery) |
+| `caj-b-pub-*` | alz-prod/infra/pool-b-pub | ❌ raw `azurerm_container_app_job` | Refactor to #2 OR archive if unused |
+| `pool-w-org` | alz-prod/pool-w-org | ❌ uses raw `Azure/avm-res-compute-virtualmachinescaleset` | Refactor to #1 (blocked on v1.1.0 - 5 BYO inputs in flight) |
+| `caj-personal-runner` | personal-runners-infra (Linux) | ✅ consumes #3 | None - compliant via fork (justified above) |
+| `vmss_pool_w_pub` | personal-runners-infra (Windows) | ❌ raw `azapi_resource` | Refactor to #1 (blocked on v1.1.0) |
+| `runner_job` | alz-avm-tf-demo/alz-aca-runners | ✅ repo deleted from GitHub 2026-05-28 | Done |
+
+### Archived / retired
+
+- `alz-avm-tf-demo/terraform-azurerm-github-runners-alz-corp` - archived 2026-05-28 (zero consumers - see `martinopedal/terraform-azurerm-github-runners-alz-corp` instead)
+- `alz-avm-tf-demo/alz-aca-runners` - deleted 2026-05-28 (never deployed; sub-10 holds only orphan state SA + VNet pending cleanup)
+
+### Pinning
+
+Pin versions explicitly. No `?ref=main`. No `version = "~> 0"`. Fork pins use the suffixed tag (e.g. `v0.6.0-personal.2`) and the corresponding upstream tag MUST be referenced in the fork's release notes so the diff is always inspectable.
+
 ## What This Module Is
 
 This is a Terraform module that deploys self-hosted **GitHub Actions Runners** and **Azure DevOps Agents** on **Azure Container Apps (ACA)** in an **Azure Landing Zone Corp** subscription.
