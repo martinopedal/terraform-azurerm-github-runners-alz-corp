@@ -11,7 +11,7 @@ image builds, and job execution will fail.
 > below and labels including `alz-a1` / `alz-p1` / `alz-corp` / `private-runner`. A `public`
 > deployment MUST NOT attach to the ALZ corp VNet, MUST NOT have line-of-sight to corp KV /
 > state SAs, and MUST use labels including `public-runner` or a `pub-*` prefix. Run public and
-> private pools as separate module instances — never share a single pool between public and
+> private pools as separate module instances - never share a single pool between public and
 > private repos.
 
 > **Sources:** This list is compiled from the

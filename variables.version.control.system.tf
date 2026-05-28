@@ -193,15 +193,15 @@ The trust boundary this runner pool operates under. **GitHub only.** Hard-isolat
 intended for private (corp-network-attached) workloads from pools intended for public
 workloads (forks, external contributors).
 
-- `private` — pool is attached to the ALZ corp VNet, can reach private endpoints (state SAs, KV).
+- `private` - pool is attached to the ALZ corp VNet, can reach private endpoints (state SAs, KV).
   Labels MUST include one of: `alz-a1`, `alz-p1`, `alz-corp`, or `private-runner` so consumer
   workflows in private repos can target it explicitly and cannot accidentally land on a public pool.
-- `public`  — pool is isolated, has NO ALZ corp network access, NO access to corp KV/state.
+- `public`  - pool is isolated, has NO ALZ corp network access, NO access to corp KV/state.
   Labels MUST include `public-runner` or a `pub-*` prefix. Use this for pools that service
   public repos / fork PRs where workflow code is untrusted.
 
 This is enforced at plan time by validation on `version_control_system_runner_labels` below.
-Mixing public and private workloads on the same pool is a network/credential exposure risk —
+Mixing public and private workloads on the same pool is a network/credential exposure risk -
 keep them on separate module deployments with different visibility values.
 DESCRIPTION
   nullable    = false
