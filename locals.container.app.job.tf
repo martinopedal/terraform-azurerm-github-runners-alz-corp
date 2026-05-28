@@ -31,6 +31,7 @@ locals {
     },
     length(var.version_control_system_runner_labels) > 0 ? { labels = join(",", var.version_control_system_runner_labels) } : {},
     var.version_control_system_runner_no_default_labels ? { noDefaultLabels = "true" } : {},
+    var.version_control_system_keda_enable_etags ? { enableEtags = "true" } : {},
   )
 }
 
