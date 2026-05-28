@@ -732,19 +732,19 @@ Default: `30`
 
 ### <a name="input_container_app_replica_retry_limit"></a> [container\_app\_replica\_retry\_limit](#input\_container\_app\_replica\_retry\_limit)
 
-Description: The number of times to retry the runner Container Apps job.
+Description: The number of times to retry the runner Container Apps job. Default is 0: a killed runner job must not be re-spawned automatically because GitHub/AzDO already re-queues the workflow job, and a retry would double-register the runner.
 
 Type: `number`
 
-Default: `3`
+Default: `0`
 
 ### <a name="input_container_app_replica_timeout"></a> [container\_app\_replica\_timeout](#input\_container\_app\_replica\_timeout)
 
-Description: The timeout in seconds for the runner Container Apps job.
+Description: The timeout in seconds for the runner Container Apps job. Default is 5400s (90 min) to match the typical GitHub Actions / Azure DevOps workflow timeout. ACA Job hard max is 604800s (7d). Increase if individual jobs run longer than 90 min.
 
 Type: `number`
 
-Default: `1800`
+Default: `5400`
 
 ### <a name="input_container_app_sensitive_environment_variables"></a> [container\_app\_sensitive\_environment\_variables](#input\_container\_app\_sensitive\_environment\_variables)
 
