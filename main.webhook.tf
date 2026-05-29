@@ -1,6 +1,6 @@
 module "webhook_storage" {
   source  = "Azure/avm-res-storage-storageaccount/azurerm"
-  version = "0.7.0"
+  version = "0.7.1"
 
   count = var.webhook_scaling_enabled ? 1 : 0
 
