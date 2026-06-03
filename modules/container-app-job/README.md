@@ -166,6 +166,30 @@ Type: `string`
 
 The following input variables are optional (have default values):
 
+### <a name="input_custom_container_image"></a> [custom\_container\_image](#input\_custom\_container\_image)
+
+Description: Fully qualified custom runner container image to run in the ACA Job. When set, this value is used as-is instead of registry\_login\_server/container\_image\_name.
+
+Type: `string`
+
+Default: `null`
+
+### <a name="input_custom_container_image_registry_credential"></a> [custom\_container\_image\_registry\_credential](#input\_custom\_container\_image\_registry\_credential)
+
+Description: Optional registry credential for custom\_container\_image. password\_secret\_ref must match an existing Container Apps secret name on the job.
+
+Type:
+
+```hcl
+object({
+    server              = string
+    username            = string
+    password_secret_ref = string
+  })
+```
+
+Default: `null`
+
 ### <a name="input_environment_variables_placeholder"></a> [environment\_variables\_placeholder](#input\_environment\_variables\_placeholder)
 
 Description: List of environment variables to pass only to the placeholder container.
@@ -321,5 +345,5 @@ No modules.
 <!-- markdownlint-disable-next-line MD041 -->
 ## Data Collection
 
-The software may collect information about you and your use of the software and send it to Microsoft. Microsoft may use this information to provide services and improve our products and services. You may turn off the telemetry as described in the repository. There are also some features in the software that may enable you and Microsoft to collect data from users of your applications. If you use these features, you must comply with applicable law, including providing appropriate notices to users of your applications together with a copy of MicrosoftÔÇÖs privacy statement. Our privacy statement is located at <https://go.microsoft.com/fwlink/?LinkID=824704>. You can learn more about data collection and use in the help documentation and our privacy statement. Your use of the software operates as your consent to these practices.
+The software may collect information about you and your use of the software and send it to Microsoft. Microsoft may use this information to provide services and improve our products and services. You may turn off the telemetry as described in the repository. There are also some features in the software that may enable you and Microsoft to collect data from users of your applications. If you use these features, you must comply with applicable law, including providing appropriate notices to users of your applications together with a copy of Microsoft’s privacy statement. Our privacy statement is located at <https://go.microsoft.com/fwlink/?LinkID=824704>. You can learn more about data collection and use in the help documentation and our privacy statement. Your use of the software operates as your consent to these practices.
 <!-- END_TF_DOCS -->
