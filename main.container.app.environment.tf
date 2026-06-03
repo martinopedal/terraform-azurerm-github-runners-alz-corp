@@ -21,8 +21,8 @@ resource "azurerm_container_app_environment" "this" {
 
   lifecycle {
     precondition {
-      condition     = var.log_analytics_workspace_creation_enabled || var.log_analytics_workspace_id != null
-      error_message = "Cannot create a Container App Environment without a Log Analytics workspace. Either keep `log_analytics_workspace_creation_enabled = true` (default) or set `log_analytics_workspace_id` to an existing workspace resource ID."
+      condition     = var.log_analytics_workspace_creation_enabled || var.log_analytics_workspace_resource_id != null || var.log_analytics_workspace_id != null
+      error_message = "Cannot create a Container App Environment without a Log Analytics workspace. Either keep `log_analytics_workspace_creation_enabled = true` (default) or set `log_analytics_workspace_resource_id` (preferred) / the legacy `log_analytics_workspace_id` to an existing workspace resource ID."
     }
   }
 }

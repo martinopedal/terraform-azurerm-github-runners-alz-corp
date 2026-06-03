@@ -2,7 +2,7 @@ locals {
   container_app_environment_id                     = var.container_app_environment_creation_enabled ? azurerm_container_app_environment.this[0].id : var.container_app_environment_id
   container_registry_dns_zone_id                   = var.container_registry_dns_zone_id
   container_registry_private_endpoint_subnet_id    = var.container_registry_private_endpoint_subnet_id
-  log_analytics_workspace_id                       = var.log_analytics_workspace_creation_enabled ? module.log_analytics_workspace[0].resource_id : var.log_analytics_workspace_id
+  log_analytics_workspace_id                       = var.log_analytics_workspace_creation_enabled ? module.log_analytics_workspace[0].resource_id : coalesce(var.log_analytics_workspace_resource_id, var.log_analytics_workspace_id)
   registry_login_server                            = var.container_registry_creation_enabled ? module.container_registry[0].login_server : var.custom_container_registry_login_server
   resource_group_id                                = "/subscriptions/${data.azurerm_client_config.current.subscription_id}/resourceGroups/${local.resource_group_name}"
   resource_group_name                              = var.resource_group_creation_enabled ? azurerm_resource_group.this[0].name : var.resource_group_name
