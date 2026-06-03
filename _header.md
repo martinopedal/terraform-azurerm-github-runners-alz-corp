@@ -130,3 +130,44 @@ module "github_runners" {
   virtual_network_address_space = "10.0.0.0/16"
 }
 ```
+
+### GitHub Runners with a Custom Container Image
+
+Set `custom_container_image` when the runner image is built and published outside this module and the ACA Job should run that exact image instead of the module-built/default image.
+
+```hcl
+module "github_runners_custom_image" {
+  source = "github.com/martinopedal/terraform-azurerm-github-runners-alz-corp?ref=v1.4.0"
+
+  postfix  = "my-runners"
+  location = "swedencentral"
+
+  container_app_subnet_id                       = module.lz_vending.subnets["aca"].id
+  container_registry_private_endpoint_subnet_id = module.lz_vending.subnets["pe"].id
+
+  version_control_system_type                  = "github"
+  version_control_system_authentication_method = "pat"
+  version_control_system_personal_access_token = var.github_pat
+  version_control_system_organization          = "my-organization"
+  version_control_system_runner_scope          = "org"
+
+  custom_container_image = "ghcr.io/my-organization/actions-runner:sha-abc123"
+
+  container_app_sensitive_environment_variables = [
+    {
+      name                      = "REGISTRY_PASSWORD"
+      value                     = var.ghcr_pat
+      container_app_secret_name = "ghcr-token"
+      keda_auth_name            = null
+    }
+  ]
+
+  custom_container_image_registry_credential = {
+    server              = "ghcr.io"
+    username            = "my-organization"
+    password_secret_ref = "ghcr-token"
+  }
+}
+```
+
+For public images or identity-based ACR pulls, omit `custom_container_image_registry_credential`.

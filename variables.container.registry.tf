@@ -10,6 +10,22 @@ variable "container_registry_name" {
   description = "The name of the container registry. If null, defaults to `acr<postfix>`."
 }
 
+variable "custom_container_image" {
+  type        = string
+  default     = null
+  description = "Fully qualified custom runner container image to run in the ACA Job. When set, this overrides the module-built/default image in the job container template."
+}
+
+variable "custom_container_image_registry_credential" {
+  type = object({
+    server              = string
+    username            = string
+    password_secret_ref = string
+  })
+  default     = null
+  description = "Optional registry credential for custom_container_image. password_secret_ref must match a Container Apps secret name available on the job, for example one supplied through container_app_sensitive_environment_variables."
+}
+
 variable "custom_container_registry_id" {
   type        = string
   default     = null
@@ -88,12 +104,6 @@ variable "default_image_repository_url" {
   description = "The URL of the default image repository."
 }
 
-variable "use_default_container_image" {
-  type        = bool
-  default     = true
-  description = "Whether to use the default container image provided by the module."
-}
-
 variable "runner_acr_push_enabled" {
   type        = bool
   default     = false
@@ -106,4 +116,10 @@ Set to `true` when your workflows need to push images. The platform module does 
 
 Has no effect when `container_registry_creation_enabled = false`.
 DESCRIPTION
+}
+
+variable "use_default_container_image" {
+  type        = bool
+  default     = true
+  description = "Whether to use the default container image provided by the module."
 }

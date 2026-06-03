@@ -32,7 +32,7 @@ locals {
 locals {
   container_job = {
     name  = local.job_container_name
-    image = "${var.registry_login_server}/${var.container_image_name}"
+    image = var.custom_container_image != null ? var.custom_container_image : "${var.registry_login_server}/${var.container_image_name}"
     resources = {
       cpu    = var.container_cpu
       memory = var.container_memory
@@ -41,25 +41,31 @@ locals {
   }
   container_placeholder = {
     name  = local.placeholder_container_name
-    image = "${var.registry_login_server}/${var.container_image_name}"
+    image = var.custom_container_image != null ? var.custom_container_image : "${var.registry_login_server}/${var.container_image_name}"
     resources = {
       cpu    = var.container_cpu
       memory = var.container_memory
     }
     env = concat(local.final_environment_variables, local.placeholder_environment_variables)
   }
-  container_registries = var.registry_password == null ? [
+  container_registries = var.custom_container_image_registry_credential != null ? [
     {
-      server   = var.registry_login_server
-      identity = var.user_assigned_managed_identity_id
+      server            = var.custom_container_image_registry_credential.server
+      username          = var.custom_container_image_registry_credential.username
+      passwordSecretRef = var.custom_container_image_registry_credential.password_secret_ref
     }
-    ] : [
-    {
-      server            = var.registry_login_server
-      username          = var.registry_username
-      passwordSecretRef = "registry-password"
-    }
-  ]
+    ] : (var.registry_password == null ? [
+      {
+        server   = var.registry_login_server
+        identity = var.user_assigned_managed_identity_id
+      }
+      ] : [
+      {
+        server            = var.registry_login_server
+        username          = var.registry_username
+        passwordSecretRef = "registry-password"
+      }
+  ])
 }
 
 locals {
