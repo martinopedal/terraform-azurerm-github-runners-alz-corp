@@ -9,11 +9,16 @@ Works with:
 - [ALZ Terraform Modules](https://github.com/Azure/terraform-azurerm-caf-enterprise-scale) for platform landing zone
 - [ALZ Vending Module](https://github.com/Azure/terraform-azurerm-lz-vending) for subscription vending (provides Resource Group, VNet, subnets)
 - [Azure Virtual Network Manager (AVNM)](https://learn.microsoft.com/azure/virtual-network-manager/overview) for hub-spoke connectivity
-- Azure Firewall for central egress (see [docs/FIREWALL-REQUIREMENTS.md](./docs/FIREWALL-REQUIREMENTS.md) and [FIREWALL-RULES.md](./FIREWALL-RULES.md))
+- Azure Firewall for central egress (see [EGRESS.md](./EGRESS.md))
 
 > Forked from [Azure/terraform-azurerm-avm-ptn-cicd-agents-and-runners](https://github.com/Azure/terraform-azurerm-avm-ptn-cicd-agents-and-runners) and adapted for ALZ Corp.
 
 ---
+
+
+## Network egress requirements
+
+Force-tunneled ALZ spokes must allow the runner dependencies documented in [EGRESS.md](./EGRESS.md) at the hub Azure Firewall. The canonical implemented list for this estate is maintained in `alz-avm-tf-demo/alz-firewall-ops` as `FIREWALL-EGRESS-IMPLEMENTED.md`.
 
 ## Quick Start
 
