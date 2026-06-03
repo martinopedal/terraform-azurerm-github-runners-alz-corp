@@ -1,3 +1,15 @@
+variable "container_app_subnet_id" {
+  type        = string
+  description = "The resource ID of the subnet for the Container App Environment. Must have delegation for `Microsoft.App/environments`. Provided by ALZ Vending Module."
+  nullable    = false
+}
+
+variable "container_registry_private_endpoint_subnet_id" {
+  type        = string
+  description = "The resource ID of the subnet for the Container Registry private endpoint. Provided by ALZ Vending Module."
+  nullable    = false
+}
+
 variable "location" {
   type        = string
   description = "Azure region where the resource should be deployed."
@@ -12,18 +24,6 @@ variable "postfix" {
     condition     = length(var.postfix) <= 20
     error_message = "Variable 'postfix' must be less than 20 characters due to container app job naming restrictions. '${var.postfix}' is ${length(var.postfix)} characters."
   }
-}
-
-variable "container_app_subnet_id" {
-  type        = string
-  description = "The resource ID of the subnet for the Container App Environment. Must have delegation for `Microsoft.App/environments`. Provided by ALZ Vending Module."
-  nullable    = false
-}
-
-variable "container_registry_private_endpoint_subnet_id" {
-  type        = string
-  description = "The resource ID of the subnet for the Container Registry private endpoint. Provided by ALZ Vending Module."
-  nullable    = false
 }
 
 variable "container_registry_dns_zone_id" {
@@ -105,4 +105,3 @@ variable "use_zone_redundancy" {
     error_message = "Zone redundancy is not supported in the specified location."
   }
 }
-

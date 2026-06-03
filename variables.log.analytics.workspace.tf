@@ -21,28 +21,6 @@ variable "log_analytics_workspace_id" {
   }
 }
 
-variable "log_analytics_workspace_resource_id" {
-  type        = string
-  default     = null
-  description = "The resource ID of an existing Log Analytics Workspace to attach to the Container App Environment when `log_analytics_workspace_creation_enabled` is `false`. Preferred over the legacy `log_analytics_workspace_id` input."
-
-  validation {
-    condition     = var.log_analytics_workspace_resource_id == null || can(provider::azapi::parse_resource_id("Microsoft.OperationalInsights/workspaces@2023-09-01", var.log_analytics_workspace_resource_id))
-    error_message = "Variable log_analytics_workspace_resource_id must be a valid Log Analytics Workspace resource ID (e.g. /subscriptions/<id>/resourceGroups/<rg>/providers/Microsoft.OperationalInsights/workspaces/<name>)."
-  }
-
-  validation {
-    condition     = var.log_analytics_workspace_resource_id == null || var.log_analytics_workspace_id == null || var.log_analytics_workspace_resource_id == var.log_analytics_workspace_id
-    error_message = "Only one Log Analytics Workspace ID should be provided. If both log_analytics_workspace_resource_id and the legacy log_analytics_workspace_id are set, they must match."
-  }
-}
-
-variable "log_analytics_workspace_name" {
-  type        = string
-  default     = null
-  description = "The name of the log analytics workspace. Only required if `log_analytics_workspace_creation_enabled == false`."
-}
-
 variable "log_analytics_workspace_internet_ingestion_enabled" {
   type        = bool
   default     = null
@@ -53,6 +31,27 @@ variable "log_analytics_workspace_internet_query_enabled" {
   type        = bool
   default     = null
   description = "Whether or not to enable internet query for the Log Analytics workspace. If null, the module defaults this to `false`."
+}
+
+variable "log_analytics_workspace_name" {
+  type        = string
+  default     = null
+  description = "The name of the log analytics workspace. Only required if `log_analytics_workspace_creation_enabled == false`."
+}
+
+variable "log_analytics_workspace_resource_id" {
+  type        = string
+  default     = null
+  description = "The resource ID of an existing Log Analytics Workspace to attach to the Container App Environment when `log_analytics_workspace_creation_enabled` is `false`. Preferred over the legacy `log_analytics_workspace_id` input."
+
+  validation {
+    condition     = var.log_analytics_workspace_resource_id == null || can(provider::azapi::parse_resource_id("Microsoft.OperationalInsights/workspaces@2023-09-01", var.log_analytics_workspace_resource_id))
+    error_message = "Variable log_analytics_workspace_resource_id must be a valid Log Analytics Workspace resource ID (e.g. /subscriptions/<id>/resourceGroups/<rg>/providers/Microsoft.OperationalInsights/workspaces/<name>)."
+  }
+  validation {
+    condition     = var.log_analytics_workspace_resource_id == null || var.log_analytics_workspace_id == null || var.log_analytics_workspace_resource_id == var.log_analytics_workspace_id
+    error_message = "Only one Log Analytics Workspace ID should be provided. If both log_analytics_workspace_resource_id and the legacy log_analytics_workspace_id are set, they must match."
+  }
 }
 
 variable "log_analytics_workspace_retention_in_days" {

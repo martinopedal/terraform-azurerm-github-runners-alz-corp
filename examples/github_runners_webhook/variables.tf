@@ -8,10 +8,32 @@ variable "container_registry_private_endpoint_subnet_id" {
   description = "Resource ID of the ACR private endpoint subnet from ALZ Vending."
 }
 
+variable "github_organization" {
+  type        = string
+  description = "GitHub organization name."
+}
+
+variable "github_personal_access_token" {
+  type        = string
+  description = "GitHub PAT with repo and admin:org scopes."
+  sensitive   = true
+}
+
+variable "github_repository" {
+  type        = string
+  description = "GitHub repository name."
+}
+
 variable "container_registry_dns_zone_id" {
   type        = string
   default     = null
   description = "Private DNS zone ID for ACR. Null if handled by Azure Policy."
+}
+
+variable "webhook_receiver_principal_ids" {
+  type        = set(string)
+  default     = []
+  description = "Principal IDs of the webhook receiver(s) (e.g. Function App managed identity) granted Storage Queue Data Message Sender on the queue."
 }
 
 variable "webhook_storage_private_endpoint_subnet_id" {
@@ -24,26 +46,4 @@ variable "webhook_storage_queue_dns_zone_id" {
   type        = string
   default     = null
   description = "Private DNS zone ID for privatelink.queue.core.windows.net. Null if handled by Azure Policy."
-}
-
-variable "webhook_receiver_principal_ids" {
-  type        = set(string)
-  default     = []
-  description = "Principal IDs of the webhook receiver(s) (e.g. Function App managed identity) granted Storage Queue Data Message Sender on the queue."
-}
-
-variable "github_organization" {
-  type        = string
-  description = "GitHub organization name."
-}
-
-variable "github_repository" {
-  type        = string
-  description = "GitHub repository name."
-}
-
-variable "github_personal_access_token" {
-  type        = string
-  sensitive   = true
-  description = "GitHub PAT with repo and admin:org scopes."
 }

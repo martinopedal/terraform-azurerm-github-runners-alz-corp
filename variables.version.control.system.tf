@@ -1,3 +1,9 @@
+variable "version_control_system_organization" {
+  type        = string
+  description = "The organization for the version control system. For Azure DevOps: the full URL (e.g. `https://dev.azure.com/my-org`). For GitHub: the organization name."
+  nullable    = false
+}
+
 variable "version_control_system_type" {
   type        = string
   description = "The type of the version control system. Allowed values are `azuredevops` or `github`."
@@ -9,10 +15,51 @@ variable "version_control_system_type" {
   }
 }
 
-variable "version_control_system_organization" {
+variable "runner_visibility" {
   type        = string
-  description = "The organization for the version control system. For Azure DevOps: the full URL (e.g. `https://dev.azure.com/my-org`). For GitHub: the organization name."
+  default     = "private"
+  description = <<DESCRIPTION
+The trust boundary this runner pool operates under. **GitHub only.** Hard-isolates pools
+intended for private (corp-network-attached) workloads from pools intended for public
+workloads (forks, external contributors).
+
+- `private` - pool is attached to the ALZ corp VNet, can reach private endpoints (state SAs, KV).
+  Labels MUST include one of: `alz-a1`, `alz-p1`, `alz-corp`, or `private-runner` so consumer
+  workflows in private repos can target it explicitly and cannot accidentally land on a public pool.
+- `public`  - pool is isolated, has NO ALZ corp network access, NO access to corp KV/state.
+  Labels MUST include `public-runner` or a `pub-*` prefix. Use this for pools that service
+  public repos / fork PRs where workflow code is untrusted.
+
+This is enforced at plan time by validation on `version_control_system_runner_labels` below.
+Mixing public and private workloads on the same pool is a network/credential exposure risk -
+keep them on separate module deployments with different visibility values.
+DESCRIPTION
   nullable    = false
+
+  validation {
+    condition     = contains(["private", "public"], var.runner_visibility)
+    error_message = "runner_visibility must be 'private' or 'public'."
+  }
+  validation {
+    condition = (
+      var.version_control_system_type == "azuredevops"
+      ? var.runner_visibility == "private"
+      : true
+    )
+    error_message = "runner_visibility is GitHub-only. Azure DevOps deployments must leave it at the default 'private'."
+  }
+}
+
+variable "version_control_system_agent_name_prefix" {
+  type        = string
+  default     = null
+  description = "The prefix for agent/runner names."
+}
+
+variable "version_control_system_agent_target_queue_length" {
+  type        = number
+  default     = 1
+  description = "The target value for the amount of pending jobs to trigger scaling."
 }
 
 variable "version_control_system_authentication_method" {
@@ -39,6 +86,92 @@ DESCRIPTION
   }
 }
 
+variable "version_control_system_enterprise" {
+  type        = string
+  default     = null
+  description = "The enterprise name. Required for GitHub when `runner_scope` is `ent`."
+}
+
+variable "version_control_system_github_application_id" {
+  type        = string
+  default     = ""
+  description = <<DESCRIPTION
+The GitHub App ID. Required when `authentication_method` is `github_app`.
+
+The GitHub App is used by the **runner at runtime** to obtain registration tokens from GitHub.
+This is NOT the same as the Azure AD App Registration used for Terraform/Azure authentication.
+DESCRIPTION
+
+  validation {
+    condition = (
+      var.version_control_system_authentication_method == "github_app"
+      ? length(var.version_control_system_github_application_id) > 0
+      : true
+    )
+    error_message = "github_application_id must be defined when authentication_method is 'github_app'."
+  }
+}
+
+variable "version_control_system_github_application_installation_id" {
+  type        = string
+  default     = ""
+  description = "The GitHub App installation ID. Required when `authentication_method` is `github_app`."
+
+  validation {
+    condition = (
+      var.version_control_system_authentication_method == "github_app"
+      ? length(var.version_control_system_github_application_installation_id) > 0
+      : true
+    )
+    error_message = "github_application_installation_id must be defined when authentication_method is 'github_app'."
+  }
+}
+
+variable "version_control_system_github_application_key" {
+  type        = string
+  default     = null
+  description = "The GitHub App private key. Required when `authentication_method` is `github_app`."
+  sensitive   = true
+
+  validation {
+    condition = (
+      var.version_control_system_authentication_method == "github_app"
+      ? var.version_control_system_github_application_key != "" && var.version_control_system_github_application_key != null
+      : true
+    )
+    error_message = "github_application_key must be defined when authentication_method is 'github_app'."
+  }
+}
+
+variable "version_control_system_github_url" {
+  type        = string
+  default     = "github.com"
+  description = "The base URL for GitHub. Use `github.com` for standard GitHub, or `<subdomain>.ghe.com` for GitHub Enterprise Cloud with data residency."
+
+  validation {
+    condition     = can(regex("^[a-zA-Z0-9][a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$", var.version_control_system_github_url))
+    error_message = "Must be a valid domain name without protocol prefix."
+  }
+}
+
+variable "version_control_system_keda_enable_etags" {
+  type        = bool
+  default     = false
+  description = <<DESCRIPTION
+When true, sets `enableEtags = "true"` on the KEDA `github-runner` scaler so the scaler uses HTTP ETag conditional requests when polling the GitHub API, reducing API consumption when nothing has changed since the previous poll. Requires KEDA >= 2.17. **GitHub only.**
+DESCRIPTION
+  nullable    = false
+
+  validation {
+    condition = (
+      var.version_control_system_type == "azuredevops"
+      ? var.version_control_system_keda_enable_etags == false
+      : true
+    )
+    error_message = "version_control_system_keda_enable_etags is GitHub-only."
+  }
+}
+
 variable "version_control_system_personal_access_token" {
   type        = string
   default     = null
@@ -61,6 +194,12 @@ DESCRIPTION
     )
     error_message = "version_control_system_personal_access_token must be defined when authentication_method is 'pat'."
   }
+}
+
+variable "version_control_system_placeholder_agent_name" {
+  type        = string
+  default     = null
+  description = "The placeholder agent name."
 }
 
 variable "version_control_system_pool_name" {
@@ -114,12 +253,10 @@ DESCRIPTION
     ])
     error_message = "Each label must be non-empty, contain no commas, and be <=100 chars (LABELS and KEDA `labels` are comma-separated lists)."
   }
-
   validation {
     condition     = length(var.version_control_system_runner_labels) == length(distinct(var.version_control_system_runner_labels))
     error_message = "version_control_system_runner_labels must not contain duplicates."
   }
-
   validation {
     condition = (
       var.version_control_system_type == "github" && var.runner_visibility == "private"
@@ -131,7 +268,6 @@ DESCRIPTION
     )
     error_message = "When runner_visibility = 'private', version_control_system_runner_labels MUST include one of: 'alz-a1', 'alz-p1', 'alz-corp', 'private-runner'. This prevents public-repo workflows from accidentally landing on a corp-network-attached pool. See variable docs for runner_visibility."
   }
-
   validation {
     condition = (
       var.version_control_system_type == "github" && var.runner_visibility == "public"
@@ -143,7 +279,6 @@ DESCRIPTION
     )
     error_message = "When runner_visibility = 'public', version_control_system_runner_labels MUST include 'public-runner', 'pub', or a label starting with 'pub-'. This forces explicit opt-in for any workflow targeting the public pool and keeps public/private label sets non-overlapping."
   }
-
   validation {
     condition = (
       var.version_control_system_type == "azuredevops"
@@ -174,7 +309,6 @@ DESCRIPTION
     )
     error_message = "version_control_system_runner_no_default_labels = true requires at least one entry in version_control_system_runner_labels (otherwise the runner would have no labels and be unreachable)."
   }
-
   validation {
     condition = (
       var.version_control_system_type == "azuredevops"
@@ -182,60 +316,6 @@ DESCRIPTION
       : true
     )
     error_message = "version_control_system_runner_no_default_labels is GitHub-only."
-  }
-}
-
-variable "version_control_system_keda_enable_etags" {
-  type        = bool
-  default     = false
-  description = <<DESCRIPTION
-When true, sets `enableEtags = "true"` on the KEDA `github-runner` scaler so the scaler uses HTTP ETag conditional requests when polling the GitHub API, reducing API consumption when nothing has changed since the previous poll. Requires KEDA >= 2.17. **GitHub only.**
-DESCRIPTION
-  nullable    = false
-
-  validation {
-    condition = (
-      var.version_control_system_type == "azuredevops"
-      ? var.version_control_system_keda_enable_etags == false
-      : true
-    )
-    error_message = "version_control_system_keda_enable_etags is GitHub-only."
-  }
-}
-
-variable "runner_visibility" {
-  type        = string
-  default     = "private"
-  description = <<DESCRIPTION
-The trust boundary this runner pool operates under. **GitHub only.** Hard-isolates pools
-intended for private (corp-network-attached) workloads from pools intended for public
-workloads (forks, external contributors).
-
-- `private` - pool is attached to the ALZ corp VNet, can reach private endpoints (state SAs, KV).
-  Labels MUST include one of: `alz-a1`, `alz-p1`, `alz-corp`, or `private-runner` so consumer
-  workflows in private repos can target it explicitly and cannot accidentally land on a public pool.
-- `public`  - pool is isolated, has NO ALZ corp network access, NO access to corp KV/state.
-  Labels MUST include `public-runner` or a `pub-*` prefix. Use this for pools that service
-  public repos / fork PRs where workflow code is untrusted.
-
-This is enforced at plan time by validation on `version_control_system_runner_labels` below.
-Mixing public and private workloads on the same pool is a network/credential exposure risk -
-keep them on separate module deployments with different visibility values.
-DESCRIPTION
-  nullable    = false
-
-  validation {
-    condition     = contains(["private", "public"], var.runner_visibility)
-    error_message = "runner_visibility must be 'private' or 'public'."
-  }
-
-  validation {
-    condition = (
-      var.version_control_system_type == "azuredevops"
-      ? var.runner_visibility == "private"
-      : true
-    )
-    error_message = "runner_visibility is GitHub-only. Azure DevOps deployments must leave it at the default 'private'."
   }
 }
 
@@ -247,91 +327,5 @@ variable "version_control_system_runner_scope" {
   validation {
     condition     = contains(["ent", "org", "repo"], var.version_control_system_runner_scope)
     error_message = "version_control_system_runner_scope must be 'ent', 'org', or 'repo'."
-  }
-}
-
-variable "version_control_system_agent_name_prefix" {
-  type        = string
-  default     = null
-  description = "The prefix for agent/runner names."
-}
-
-variable "version_control_system_agent_target_queue_length" {
-  type        = number
-  default     = 1
-  description = "The target value for the amount of pending jobs to trigger scaling."
-}
-
-variable "version_control_system_enterprise" {
-  type        = string
-  default     = null
-  description = "The enterprise name. Required for GitHub when `runner_scope` is `ent`."
-}
-
-variable "version_control_system_placeholder_agent_name" {
-  type        = string
-  default     = null
-  description = "The placeholder agent name."
-}
-
-variable "version_control_system_github_url" {
-  type        = string
-  default     = "github.com"
-  description = "The base URL for GitHub. Use `github.com` for standard GitHub, or `<subdomain>.ghe.com` for GitHub Enterprise Cloud with data residency."
-
-  validation {
-    condition     = can(regex("^[a-zA-Z0-9][a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$", var.version_control_system_github_url))
-    error_message = "Must be a valid domain name without protocol prefix."
-  }
-}
-
-variable "version_control_system_github_application_id" {
-  type        = string
-  default     = ""
-  description = <<DESCRIPTION
-The GitHub App ID. Required when `authentication_method` is `github_app`.
-
-The GitHub App is used by the **runner at runtime** to obtain registration tokens from GitHub.
-This is NOT the same as the Azure AD App Registration used for Terraform/Azure authentication.
-DESCRIPTION
-
-  validation {
-    condition = (
-      var.version_control_system_authentication_method == "github_app"
-      ? length(var.version_control_system_github_application_id) > 0
-      : true
-    )
-    error_message = "github_application_id must be defined when authentication_method is 'github_app'."
-  }
-}
-
-variable "version_control_system_github_application_installation_id" {
-  type        = string
-  default     = ""
-  description = "The GitHub App installation ID. Required when `authentication_method` is `github_app`."
-
-  validation {
-    condition = (
-      var.version_control_system_authentication_method == "github_app"
-      ? length(var.version_control_system_github_application_installation_id) > 0
-      : true
-    )
-    error_message = "github_application_installation_id must be defined when authentication_method is 'github_app'."
-  }
-}
-
-variable "version_control_system_github_application_key" {
-  type        = string
-  default     = null
-  description = "The GitHub App private key. Required when `authentication_method` is `github_app`."
-  sensitive   = true
-
-  validation {
-    condition = (
-      var.version_control_system_authentication_method == "github_app"
-      ? var.version_control_system_github_application_key != "" && var.version_control_system_github_application_key != null
-      : true
-    )
-    error_message = "github_application_key must be defined when authentication_method is 'github_app'."
   }
 }

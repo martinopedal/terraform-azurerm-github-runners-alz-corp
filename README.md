@@ -1,524 +1,137 @@
-# Self-Hosted CI/CD Runners for Azure Landing Zone Corp
-
-ALZ Corp subscriptions route all traffic through a central Azure Firewall and have no public IPs. The upstream [AVM CI/CD pattern module](https://github.com/Azure/terraform-azurerm-avm-ptn-cicd-agents-and-runners) creates its own VNet, NAT Gateway, and Public IP, which conflicts with that setup.
-
-This module removes those networking components and deploys self-hosted **GitHub Actions Runners** or **Azure DevOps Agents** on **Azure Container Apps**, using the VNet and subnets your landing zone already provides.
-
-Works with:
-
-- [ALZ Terraform Modules](https://github.com/Azure/terraform-azurerm-caf-enterprise-scale) for platform landing zone
-- [ALZ Vending Module](https://github.com/Azure/terraform-azurerm-lz-vending) for subscription vending (provides Resource Group, VNet, subnets)
-- [Azure Virtual Network Manager (AVNM)](https://learn.microsoft.com/azure/virtual-network-manager/overview) for hub-spoke connectivity
-- Azure Firewall for central egress (see [EGRESS.md](./EGRESS.md))
-
-> Forked from [Azure/terraform-azurerm-avm-ptn-cicd-agents-and-runners](https://github.com/Azure/terraform-azurerm-avm-ptn-cicd-agents-and-runners) and adapted for ALZ Corp.
-
----
-
-
-## Network egress requirements
-
-Force-tunneled ALZ spokes must allow the runner dependencies documented in [EGRESS.md](./EGRESS.md) at the hub Azure Firewall. The canonical implemented list for this estate is maintained in `alz-avm-tf-demo/alz-firewall-ops` as `FIREWALL-EGRESS-IMPLEMENTED.md`.
-
-## Quick Start
-
-### Version pinning
-
-Pin consumers to the release tag so runner bootstrap behavior is reproducible:
-
-```hcl
-module "corp_runners" {
-  source = "github.com/martinopedal/terraform-azurerm-github-runners-alz-corp?ref=v1.0.0"
-
-  # ...
-}
-```
-
-Minimal example: GitHub runners with PAT auth in an ALZ Corp subscription.
-
-```hcl
-module "github_runners" {
-  source = "github.com/martinopedal/terraform-azurerm-github-runners-alz-corp?ref=v1.0.0"
-
-  postfix  = "ghrun"
-  location = "swedencentral"
-
-  # Subnets from ALZ Vending Module
-  container_app_subnet_id                      = module.lz_vending.subnets["aca"].id
-  container_registry_private_endpoint_subnet_id = module.lz_vending.subnets["pe"].id
-
-  # GitHub
-  version_control_system_type                  = "github"
-  version_control_system_organization          = "my-org"
-  version_control_system_repository            = "my-repo"
-  version_control_system_personal_access_token = var.github_pat
-}
-```
-
-Then reference the runner in your workflow:
-
-```yaml
-jobs:
-  deploy:
-    runs-on: self-hosted
-    steps:
-      - uses: actions/checkout@v4
-      - run: terraform plan
-```
-
-See [Usage examples](#usage---github-runners-with-pat) below for GitHub App auth, Azure DevOps PAT, and Azure DevOps UAMI.
-
----
-
-## Quick Start: webhook-driven scaling
-
-For sub-second scale-up with **no GitHub/AzDO API polling**, enable webhook mode. KEDA scales on a private Storage Queue fed by a webhook receiver you host (Function / Logic App / APIM).
-
-```hcl
-module "github_runners" {
-  source = "github.com/martinopedal/terraform-azurerm-github-runners-alz-corp?ref=v1.0.0"
-
-  postfix  = "ghrun"
-  location = "swedencentral"
-
-  container_app_subnet_id                       = module.lz_vending.subnets["aca"].id
-  container_registry_private_endpoint_subnet_id = module.lz_vending.subnets["pe"].id
-
-  version_control_system_type                  = "github"
-  version_control_system_organization          = "my-org"
-  version_control_system_repository            = "my-repo"
-  version_control_system_personal_access_token = var.github_pat
-
-  # Webhook-driven scaling
-  webhook_scaling_enabled                  = true
-  webhook_storage_private_endpoint_subnet_id = module.lz_vending.subnets["pe"].id
-  webhook_storage_queue_dns_zone_id        = azurerm_private_dns_zone.queue.id
-  webhook_receiver_principal_ids = [
-    azurerm_user_assigned_identity.webhook_receiver.principal_id,
-  ]
-}
-```
-
-**Prerequisites (caller-supplied):**
-- Subnet for the Storage Account private endpoint (can reuse the ACR PE subnet).
-- Private DNS zone `privatelink.queue.core.windows.net` (or central DNS / Azure Policy).
-- A webhook receiver with a managed identity. The module grants it `Storage Queue Data Message Sender` on the queue.
-- `storage_use_azuread = true` on the `azurerm` provider block. The Storage Account is created with `shared_access_key_enabled = false` and the AVM submodule's queue resource talks Storage data-plane during apply - without this flag the provider falls back to shared-key auth and the apply fails with `KeyBasedAuthenticationNotPermitted`. See [WEBHOOKS.md](./WEBHOOKS.md#caller-prerequisites-required-when-webhook_scaling_enabled--true) for the full prereq list including the data-plane RBAC role.
-
-**Receiver contract:** see [WEBHOOKS.md](./WEBHOOKS.md) for payload shape, idempotency rules, and a sample Azure Function.
-
-**Two-phase apply, known issue:** the upstream storage AVM submodule has a `count`-on-unknown bug when the private DNS zone ID is computed in the same plan. If you hit `The "count" value depends on resource attributes that cannot be determined until apply`, run a targeted apply for the network prerequisites first:
-
-```powershell
-terraform apply -target=azurerm_virtual_network.this -target=azurerm_subnet.aca -target=azurerm_subnet.pe -target=azurerm_private_dns_zone.queue -target=azurerm_private_dns_zone.acr
-terraform apply
-```
-
-**Post-deploy verification:**
-
-```powershell
-az containerapp job show -g <rg> -n cj-ghrun --query "properties.configuration | {trigger:triggerType, rules:eventTriggerConfig.scale.rules[].{name:name, type:type, queue:metadata.queueName, account:metadata.accountName, identity:identity}}"
-```
-
-Expect `triggerType=Event`, scaler `azure-queue`, identity is the runner UAMI resource ID, `queueName=runner-jobs`.
-
-End-to-end working example: [`examples/github_runners_webhook/`](./examples/github_runners_webhook/).
-
----
-
-## ALZ Provides vs. This Module Creates
-
-| Resource | ALZ / Platform team | This module |
-|---|---|---|
-| Virtual Network + Subnets | Yes (Vending Module) | No |
-| Hub-spoke connectivity | Yes (AVNM) | No |
-| Azure Firewall + egress rules | Yes (Platform team, see [FIREWALL-RULES.md](./FIREWALL-RULES.md)) | No |
-| Private DNS for `privatelink.azurecr.io` | Yes (central DNS or Azure Policy) | No |
-| NAT Gateway / Public IP | Not needed | Not created |
-| Resource Group | Optional (Vending Module can provide) | Yes (optional) |
-| Azure Container Registry (Premium, private) | N/A | Yes |
-| Container App Environment (internal) | N/A | Yes |
-| Container App Job (KEDA-scaled) | N/A | Yes |
-| User Assigned Managed Identity | N/A | Yes |
-| Log Analytics Workspace | N/A | Yes |
-
----
-
-## Authentication
-
-This module involves **two separate authentication layers** that serve different purposes.
-These are frequently confused, so this section explains each one.
-
-### Layer 1: Terraform to Azure (Infrastructure Deployment)
-
-**"How does Terraform authenticate to Azure to create the resources?"**
-
-This is handled **outside this module** in your CI/CD pipeline or local environment:
-
-| Method | When to Use | How |
-|---|---|---|
-| **Workload Identity Federation (OIDC)** | CI/CD pipelines (recommended) | `ARM_CLIENT_ID` + `ARM_TENANT_ID` + `ARM_SUBSCRIPTION_ID` + `ARM_OIDC_TOKEN`/`ARM_OIDC_REQUEST_*` |
-| **Service Principal + Client Secret** | CI/CD pipelines (legacy) | `ARM_CLIENT_ID` + `ARM_CLIENT_SECRET` + `ARM_TENANT_ID` + `ARM_SUBSCRIPTION_ID` |
-| **Managed Identity** | Azure-hosted deployment agents | `ARM_USE_MSI = true` |
-| **Azure CLI** | Local development | `az login` before `terraform apply` |
-
-> **This module does NOT configure Terraform authentication.** That's your pipeline's responsibility.
-
-### Layer 2: Runner/Agent to VCS Platform (Runtime Registration)
-
-**"How does the self-hosted runner authenticate to GitHub/Azure DevOps to pick up jobs?"**
-
-This is what `version_control_system_authentication_method` configures. The runner container
-uses these credentials **at runtime** to register itself and poll for jobs:
-
-#### GitHub Options
-
-| Method | Variable | How It Works |
-|---|---|---|
-| **PAT** | `version_control_system_personal_access_token` | A GitHub Personal Access Token (classic with `repo` + `admin:org` scopes, or fine-grained equivalent). Stored as a Container App secret. The KEDA scaler also uses it to poll for queued workflows. |
-| **GitHub App** | `version_control_system_github_application_id` + `_installation_id` + `_key` | A GitHub App installed on your org/repo. The runner uses the App's private key to generate short-lived tokens. No long-lived token, scoped permissions, audit trail. Preferred for production. |
-
-#### Azure DevOps Options
-
-| Method | Variable | How It Works |
-|---|---|---|
-| **PAT** | `version_control_system_personal_access_token` | An Azure DevOps PAT with `Agent Pools (Read & manage)` scope. Stored as a Container App secret. Used by both the agent and the KEDA scaler. |
-| **UAMI** | (No token needed) | A User Assigned Managed Identity registered as a service principal in Azure DevOps with Administrator role on the target agent pool. No secrets to manage or rotate. The agent uses the managed identity to obtain tokens from Entra ID. |
-
-### Layer 3: Runner/Agent UAMI to Azure Resources (Workload Access)
-
-**"How does the runner access Azure resources (Storage, Key Vault, etc.) during job execution?"**
-
-The User Assigned Managed Identity (UAMI) created by this module is attached to the Container App Job.
-Your workflow steps can use this identity to authenticate to Azure resources without secrets:
-
-```yaml
-# GitHub Actions example
-- uses: azure/login@v2
-  with:
-    client-id: ${{ secrets.UAMI_CLIENT_ID }}
-    tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-    subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-```
-
-Grant the UAMI appropriate RBAC roles on the resources your pipelines need to access.
-
----
-
-## Architecture
-
-```mermaid
-flowchart TB
-    subgraph Platform["ALZ Platform (Connectivity Subscription)"]
-        FW["Azure Firewall\negress"]
-        AVNM["AVNM\nHub-Spoke"]
-        DNS["Central DNS\nprivatelink.azurecr.io"]
-    end
-
-    subgraph Corp["ALZ Corp Subscription (from Vending Module)"]
-        subgraph VNet["VNet (from Vending, connected via AVNM)"]
-            subgraph ACASnet["Subnet: ACA\nDelegated: Microsoft.App/environments"]
-                CAE["Container App Environment\n(internal/private)"]
-                CAJ["Container App Job\n(KEDA-scaled runner/agent)"]
-                UAMI["User Assigned\nManaged Identity"]
-            end
-            subgraph PESnet["Subnet: Private Endpoints"]
-                ACRPE["ACR Private Endpoint"]
-            end
-        end
-        ACR["Azure Container Registry\n(Premium, private)"]
-        LA["Log Analytics\nWorkspace"]
-    end
-
-    VCS(("GitHub / Azure DevOps"))
-
-    CAJ -->|"Pull image\n(UAMI + AcrPull)"| ACR
-    ACR --- ACRPE
-    ACRPE -.->|"privatelink.azurecr.io"| DNS
-    CAJ -.->|"Egress via UDR"| FW
-    FW -->|"FQDN filtered"| VCS
-    VCS -->|"KEDA polls\nfor queued jobs"| CAJ
-    CAJ -->|"Logs"| LA
-    AVNM ---|"Hub-Spoke\npeering"| VNet
-```
-
----
-
-## Prerequisites
-
-1. **ALZ Vending Module** must have provisioned:
-   - A subscription with a VNet connected to the hub via AVNM
-   - A subnet delegated to `Microsoft.App/environments` (min /27 recommended)
-   - A subnet for private endpoints (ACR)
-
-2. **Azure Firewall** must allow the FQDNs listed in [FIREWALL-RULES.md](./FIREWALL-RULES.md)
-
-3. **Private DNS** for `privatelink.azurecr.io` must resolve (via central DNS or Azure Policy)
-
-4. **`Microsoft.App` resource provider** must be registered on the subscription
-
----
-
-## Usage - GitHub Runners with PAT
-
-```hcl
-module "github_runners" {
-  source = "github.com/martinopedal/terraform-azurerm-github-runners-alz-corp?ref=v1.0.0"
-
-  postfix  = "ghrun"
-  location = "swedencentral"
-
-  # ALZ Corp networking (from Vending Module outputs)
-  container_app_subnet_id                    = module.lz_vending.subnets["aca"].id
-  container_registry_private_endpoint_subnet_id = module.lz_vending.subnets["pe"].id
-  container_registry_dns_zone_id             = data.azurerm_private_dns_zone.acr.id  # or null if policy-managed
-
-  # GitHub configuration
-  version_control_system_type                  = "github"
-  version_control_system_organization          = "my-org"
-  version_control_system_repository            = "my-repo"
-  version_control_system_authentication_method = "pat"
-  version_control_system_personal_access_token = var.github_pat  # from Key Vault or pipeline secret
-
-  tags = var.tags
-}
-```
-
-Then in your GitHub Actions workflow:
-
-```yaml
-jobs:
-  deploy:
-    runs-on: self-hosted
-    steps:
-      - uses: actions/checkout@v4
-      - run: echo "Running on self-hosted runner"
-```
-
-## Usage - Azure DevOps Agents with UAMI
-
-```hcl
-module "azuredevops_agents" {
-  source = "github.com/martinopedal/terraform-azurerm-github-runners-alz-corp?ref=v1.0.0"
-
-  postfix  = "adoagt"
-  location = "swedencentral"
-
-  # ALZ Corp networking
-  container_app_subnet_id                    = module.lz_vending.subnets["aca"].id
-  container_registry_private_endpoint_subnet_id = module.lz_vending.subnets["pe"].id
-
-  # Azure DevOps configuration - UAMI (no PAT needed)
-  version_control_system_type                  = "azuredevops"
-  version_control_system_organization          = "https://dev.azure.com/my-org"
-  version_control_system_pool_name             = "alz-corp-pool"
-  version_control_system_authentication_method = "uami"
-
-  # Pre-configured UAMI (must be registered in Azure DevOps first)
-  user_assigned_managed_identity_creation_enabled = false
-  user_assigned_managed_identity_id               = azurerm_user_assigned_identity.ado.id
-  user_assigned_managed_identity_client_id        = azurerm_user_assigned_identity.ado.client_id
-  user_assigned_managed_identity_principal_id     = azurerm_user_assigned_identity.ado.principal_id
-
-  tags = var.tags
-}
-```
-
-## Usage - GitHub Runners with GitHub App Auth
-
-```hcl
-module "github_runners" {
-  source = "github.com/martinopedal/terraform-azurerm-github-runners-alz-corp?ref=v1.0.0"
-
-  postfix  = "ghapp"
-  location = "swedencentral"
-
-  # ALZ Corp networking
-  container_app_subnet_id                    = module.lz_vending.subnets["aca"].id
-  container_registry_private_endpoint_subnet_id = module.lz_vending.subnets["pe"].id
-
-  # GitHub App authentication (no long-lived PAT)
-  version_control_system_type                               = "github"
-  version_control_system_organization                       = "my-org"
-  version_control_system_repository                         = "my-repo"
-  version_control_system_authentication_method              = "github_app"
-  version_control_system_github_application_id              = var.github_app_id
-  version_control_system_github_application_installation_id = var.github_app_installation_id
-  version_control_system_github_application_key             = var.github_app_private_key
-
-  tags = var.tags
-}
-```
-
----
-
-## How It Works
-
-1. **Image Build** - ACR Task builds the runner/agent image from
-   [Azure/avm-container-images-cicd-agents-and-runners](https://github.com/Azure/avm-container-images-cicd-agents-and-runners)
-   (or your custom image)
-2. **Idle** - Container App Job scales to zero. No runners running, no compute cost.
-3. **Job Queued** - A workflow/pipeline is triggered in GitHub or Azure DevOps
-4. **KEDA Scales Up** - The KEDA scaler starts an ephemeral Container App Job execution. By default this is the `github-runner` / `azure-pipelines` scaler **polling** the VCS API every `container_app_polling_interval_seconds`. For sub-second scale-up with no API polling, enable [webhook-driven scaling](./WEBHOOKS.md) (`webhook_scaling_enabled = true`). KEDA then scales on a private Storage Queue fed by your webhook receiver.
-5. **Runner Registers** - The container registers as a runner/agent, picks up the job, runs it
-6. **Runner Terminates** - After the job completes, the ephemeral container terminates
-7. **Scale to Zero** - If no more jobs are queued, KEDA scales back down
-
----
-
-## Scaling modes
-
-| Mode | Trigger | Latency | API load | Extra moving parts |
-|---|---|---|---|---|
-| **Polling** (default) | KEDA polls GitHub/AzDO every 30s | 0-30s | Each runner counts against API rate limit | None |
-| **Webhook** (`webhook_scaling_enabled = true`) | GitHub/AzDO webhook to your receiver to Storage Queue to KEDA `azure-queue` scaler | Queue poll interval | Zero polling against VCS | Storage Account + Queue (this module) plus a webhook receiver you host (Function/Logic App/APIM, out of module) |
-
-Full details, receiver contract, and a sample Function in [WEBHOOKS.md](./WEBHOOKS.md).
-
----
-
-## Runner labels (GitHub only)
-
-By default, GitHub-hosted runners advertise the labels `self-hosted`, `Linux`, and `X64`. Workflows target them with `runs-on: self-hosted`. When you run multiple runner pools (e.g. one per team, one per repo, one per workload class) you usually want to give each pool a distinct label so workflows can pin to it with `runs-on: <label>`.
-
-This module exposes two inputs:
-
-| Variable | Type | Default | Effect |
-|---|---|---|---|
-| `version_control_system_runner_labels` | `list(string)` | `[]` | Extra labels added to the runner at registration. Also forwarded to the KEDA `github-runner` scaler so polling mode scales the right pool. |
-| `version_control_system_runner_no_default_labels` | `bool` | `false` | Pass `--no-default-labels` to the runner. The defaults `self-hosted`/`Linux`/`X64` are dropped; only `version_control_system_runner_labels` remain. |
-
-Both inputs are GitHub-only - setting them with `version_control_system_type = "azuredevops"` fails validation. Azure DevOps uses pools and demands instead.
-
-Example: a dedicated runner pool for a single repo with its own label:
-
-```hcl
-module "github_runners_team_a" {
-  source = "github.com/martinopedal/terraform-azurerm-github-runners-alz-corp?ref=v1.1.0"
-
-  postfix  = "team-a"
-  location = "swedencentral"
-
-  container_app_subnet_id                       = module.lz_vending.subnets["aca"].id
-  container_registry_private_endpoint_subnet_id = module.lz_vending.subnets["pe"].id
-
-  version_control_system_type                  = "github"
-  version_control_system_organization          = "my-org"
-  version_control_system_repository            = "team-a-service"
-  version_control_system_personal_access_token = var.github_pat
-
-  version_control_system_runner_labels = ["team-a", "linux-x64"]
-}
-```
-
-Workflow:
-
-```yaml
-jobs:
-  build:
-    runs-on: [self-hosted, team-a]
-```
-
-**Webhook mode note:** when `webhook_scaling_enabled = true` the KEDA scaler is `azure-queue` and ignores GitHub labels - scaling is driven entirely by the Storage Queue. The labels are still applied at runner registration, so `runs-on` matching still works as expected.
-
-**Reserved env var names:** do not pass `LABELS` or `NO_DEFAULT_LABELS` via `container_app_environment_variables` when using these inputs - Azure Container Apps rejects duplicate environment variable names.
-
----
-
-## Runner Image - What's Included (and What's Not)
-
-The default image is **not** the same as GitHub's `ubuntu-latest` hosted runner. GitHub-hosted `ubuntu-latest` is ~80 GB with Docker, Node, Python, .NET, Java, Buildah, Chrome and dozens of other tools preinstalled. Self-hosted runners on Azure Container Apps use a minimal image instead.
-
-The default image is built from [`Azure/avm-container-images-cicd-agents-and-runners`](https://github.com/Azure/avm-container-images-cicd-agents-and-runners) (`github-runner-aca` / `azure-devops-agent-aca`) and contains:
-
-| Included | Not included |
-|---|---|
-| Base: `mcr.microsoft.com/azure-powershell:ubuntu-22.04` (at the pinned commit `9b4c292`) | ❌ Docker / `docker-ce-cli` |
-| `git`, `curl`, `jq`, `unzip`, `ca-certificates` | ❌ Buildah, Kaniko, Podman |
-| `nodejs`, `ruby` | ❌ Python, .NET SDK, Java, Go |
-| `azure-cli`, PowerShell (`pwsh`) | ❌ Chrome, Firefox, browsers |
-| GitHub Actions runner / Azure Pipelines agent binaries | ❌ Most things `ubuntu-latest` ships |
-
-> The default image is pinned via `default_image_repository_commit` (currently `9b4c292`) and built with `default_image_registry_dockerfile_path = "Dockerfile"`. ACR Tasks run on a case-sensitive filesystem, so the path casing must match the upstream repo.
-
-### Base image choice, why not Alpine?
-
-Don't. The GitHub Actions runner and Azure Pipelines agent are built against **glibc**; Alpine uses **musl**. `actions/setup-node`, `setup-python`, `setup-dotnet` all ship glibc binaries and fail on Alpine with cryptic loader errors. Most Marketplace actions are Node-based and also break. The size win is fake once the runner payload is in. If you maintain a custom image, the sensible bases are Ubuntu 24.04, Debian 12-slim, or **Azure Linux 3.0** (`mcr.microsoft.com/azurelinux/base/core:3.0`): Microsoft-published, hardened, glibc, around 110 MB.
-
-### Why no Docker?
-
-Azure Container Apps Jobs run in a sandboxed environment that does not allow privileged containers, so traditional Docker-in-Docker (DinD) does not work. Workflow steps cannot `apt-get install docker.io` and then `docker build`. The daemon will not start.
-
-### Pushing images to the private ACR
-
-The container registry created by this module has `publicNetworkAccess = Disabled` and is reachable only via the Private Endpoint inside your VNet. The platform module stops there. Choosing a build pattern (dedicated ACR agent pool, in-runner Buildah, etc.) is a workflow concern handled separately.
-
-Set `runner_acr_push_enabled = true` to grant the runner UAMI `AcrPush` on the registry, then wire the cookbook submodule alongside this module. The submodule follows the AVM Resource Module specification: you create the subnet, the module consumes it.
-
-```hcl
-module "runners" {
-  source = "github.com/martinopedal/terraform-azurerm-github-runners-alz-corp?ref=v1.0.0"
-
-  # ... your existing inputs ...
-  runner_acr_push_enabled = true
-}
-
-resource "azurerm_subnet" "acr_agent_pool" {
-  name                              = "snet-acragent"
-  resource_group_name               = azurerm_virtual_network.this.resource_group_name
-  virtual_network_name              = azurerm_virtual_network.this.name
-  address_prefixes                  = ["10.0.3.0/24"]
-  private_endpoint_network_policies = "Disabled"
-}
-
-module "acr_agent_pool" {
-  source = "github.com/martinopedal/github-runners-alz-corp-cookbook//modules/acr-agent-pool"
-
-  name                               = "vnetpool"
-  location                           = "swedencentral"
-  container_registry_resource_id     = module.runners.container_registry_resource_id
-  virtual_network_subnet_resource_id = azurerm_subnet.acr_agent_pool.id
-}
-```
-
-Companion cookbook: [`github-runners-alz-corp-cookbook`](https://github.com/martinopedal/github-runners-alz-corp-cookbook)
-
-- TF submodule [`modules/acr-agent-pool`](https://github.com/martinopedal/github-runners-alz-corp-cookbook/tree/main/modules/acr-agent-pool) for the `az acr build` path (recommended).
-- Pattern docs at [`patterns/acr-build.md`](https://github.com/martinopedal/github-runners-alz-corp-cookbook/blob/main/patterns/acr-build.md) covering both `az acr build` and in-runner Buildah.
-- Drop-in [`workflows/container-build.yml`](https://github.com/martinopedal/github-runners-alz-corp-cookbook/blob/main/workflows/container-build.yml).
-
-### Custom runner images
-
-Build a custom runner image when you need extra tools (Docker CLI talking to a remote daemon, Buildah, Python, etc.). Extend the default image and pass it via `custom_container_registry_images` + `use_default_container_image = false`. See [`variables.container.registry.tf`](./variables.container.registry.tf).
-
-If your customer needs `ubuntu-latest`-equivalent tooling, point them at GitHub-hosted runners, not self-hosted. Self-hosted is for jobs that need network access into the landing zone or specific tooling, not for replicating the full hosted-runner toolbox.
-
----
-
-## Using the runners, workflow examples
-
-Drop-in workflow files live under [`docs/workflow-examples/`](./docs/workflow-examples/):
-
-- [`terraform-apply.yml`](./docs/workflow-examples/terraform-apply.yml): Terraform plan/apply using `ARM_USE_MSI=true` and the runner UAMI for Azure auth
-
-Both authenticate to Azure via the runner's managed identity. No PATs or client secrets to manage.
-
----
-
-## Examples
-
-| Example | Description |
-|---|---|
-| [github_runners_pat](./examples/github_runners_pat/) | GitHub runners with PAT authentication |
-| [github_runners_app_auth](./examples/github_runners_app_auth/) | GitHub runners with GitHub App authentication |
-| [github_runners_webhook](./examples/github_runners_webhook/) | GitHub runners with webhook-driven scaling (Storage Queue + receiver) |
-| [azuredevops_agents_pat](./examples/azuredevops_agents_pat/) | Azure DevOps agents with PAT authentication |
-| [azuredevops_agents_uami](./examples/azuredevops_agents_uami/) | Azure DevOps agents with UAMI (no secrets) |
-
----
-
 <!-- BEGIN_TF_DOCS -->
 <!-- Code generated by terraform-docs. DO NOT EDIT. -->
+# Azure Verified Module for CI/CD Agents and Runners
+
+This module deploys self-hosted Azure DevOps Agents and Github Runners with support for both Personal Access Token (PAT) and User Assigned Managed Identity (UAMI) authentication.
+
+## Features
+
+- ✅ Deploys Azure DevOps Agents with PAT or UAMI authentication
+- ✅ Deploys Github Runners with PAT or GitHub App authentication
+- ✅ Supports Azure Container Apps with KEDA auto scaling
+- ✅ Supports Azure Container Instances
+- ✅ Supports public or private networking
+- ✅ Creates all required Azure resources or use existing ones
+- ✅ No PAT token management required with UAMI authentication
+
+## Authentication Methods
+
+**Azure DevOps**: PAT (token-based) or UAMI (identity-based, no tokens required)
+**GitHub**: PAT (token-based) or GitHub App (app-based)
+
+## Prerequisites for UAMI Authentication
+
+**Important**: Before using UAMI authentication with Azure DevOps, the User Assigned Managed Identity must be configured in your Azure DevOps organization:
+
+1. **Add the identity to Azure DevOps**: The UAMI must be added as a service principal in your Azure DevOps organization with appropriate license (Basic or higher)
+2. **Grant agent pool permissions**: The UAMI service principal needs Administrator role on the target agent pool
+3. **Organization access**: The UAMI must be member of the Azure DevOps organization
+
+### Setup Options
+
+- **Option 1**: Use existing pre-configured UAMI (recommended) - requires `user_assigned_managed_identity_creation_enabled = false` and UAMI details
+- **Option 2**: Let module create UAMI, then configure it manually in Azure DevOps afterward
+- **Option 3**: Use `azure_devops_container_app_uami` example for fully automated setup
+
+> **Note**: This module handles Azure infrastructure provisioning only. Azure DevOps organization configuration is managed separately (either manually or through examples using the azuredevops provider).
+
+## Example Usage
+
+### Azure DevOps with UAMI Authentication
+
+Deploy Azure DevOps Agents using User Assigned Managed Identity - no PAT tokens required.
+
+#### Using Existing UAMI (Recommended)
+
+```hcl
+module "azure_devops_agents_uami" {
+  source  = "Azure/avm-ptn-cicd-agents-and-runners/azurerm"
+  version = "~> 0.2"
+
+  postfix  = "my-agents"
+  location = "uksouth"
+
+  version_control_system_type                  = "azuredevops"
+  version_control_system_authentication_method = "uami"  # No PAT required
+  version_control_system_organization          = "https://dev.azure.com/my-organization"
+  version_control_system_pool_name             = "my-agent-pool"
+
+  # Use existing UAMI (must be configured in Azure DevOps first)
+  user_assigned_managed_identity_creation_enabled = false
+  user_assigned_managed_identity_id               = "/subscriptions/12345678-1234-1234-1234-123456789012/resourceGroups/my-rg/providers/Microsoft.ManagedIdentity/userAssignedIdentities/my-uami"
+  user_assigned_managed_identity_client_id        = "12345678-1234-1234-1234-123456789012"
+  user_assigned_managed_identity_principal_id     = "87654321-4321-4321-4321-210987654321"
+
+  virtual_network_address_space = "10.0.0.0/16"
+}
+```
+
+#### Creating New UAMI (Requires Manual Azure DevOps Setup)
+
+```hcl
+module "azure_devops_agents_uami" {
+  source  = "Azure/avm-ptn-cicd-agents-and-runners/azurerm"
+  version = "~> 0.2"
+
+  postfix  = "my-agents"
+  location = "uksouth"
+
+  version_control_system_type                  = "azuredevops"
+  version_control_system_authentication_method = "uami"  # No PAT required
+  version_control_system_organization          = "https://dev.azure.com/my-organization"
+  version_control_system_pool_name             = "my-agent-pool"
+
+  # Module creates new UAMI (you must configure it in Azure DevOps after creation)
+  user_assigned_managed_identity_creation_enabled = true
+  user_assigned_managed_identity_name             = "uami-my-agents"
+
+  virtual_network_address_space = "10.0.0.0/16"
+}
+```
+
+### Azure DevOps with PAT Authentication
+
+Deploy Azure DevOps Agents using Personal Access Token authentication.
+
+```hcl
+module "azure_devops_agents_pat" {
+  source  = "Azure/avm-ptn-cicd-agents-and-runners/azurerm"
+  version = "~> 0.2"
+
+  postfix  = "my-agents"
+  location = "uksouth"
+
+  version_control_system_type                  = "azuredevops"
+  version_control_system_authentication_method = "pat"
+  version_control_system_personal_access_token = "**************************************"
+  version_control_system_organization          = "https://dev.azure.com/my-organization"
+  version_control_system_pool_name             = "my-agent-pool"
+
+  virtual_network_address_space = "10.0.0.0/16"
+}
+```
+
+### GitHub Runners with PAT Authentication
+
+Deploy GitHub Runners using Personal Access Token authentication.
+
+```hcl
+module "github_runners" {
+  source  = "Azure/avm-ptn-cicd-agents-and-runners/azurerm"
+  version = "~> 0.2"
+
+  postfix  = "my-runners"
+  location = "uksouth"
+
+  version_control_system_type                  = "github"
+  version_control_system_authentication_method = "pat"
+  version_control_system_personal_access_token = "**************************************"
+  version_control_system_organization          = "my-organization"
+  version_control_system_repository            = "my-repository"
+
+  virtual_network_address_space = "10.0.0.0/16"
+}
+```
 
 <!-- markdownlint-disable MD033 -->
 ## Requirements
@@ -948,7 +561,7 @@ Default: `true`
 
 ### <a name="input_log_analytics_workspace_id"></a> [log\_analytics\_workspace\_id](#input\_log\_analytics\_workspace\_id)
 
-Description: The resource Id of the Log Analytics Workspace. Required when `log_analytics_workspace_creation_enabled = false` and the Container App Environment is being created by this module.
+Description: Deprecated. Legacy alias for `log_analytics_workspace_resource_id`. The resource ID of an existing Log Analytics Workspace. New consumers should use `log_analytics_workspace_resource_id`. If both are set they must match.
 
 Type: `string`
 
@@ -973,6 +586,14 @@ Default: `null`
 ### <a name="input_log_analytics_workspace_name"></a> [log\_analytics\_workspace\_name](#input\_log\_analytics\_workspace\_name)
 
 Description: The name of the log analytics workspace. Only required if `log_analytics_workspace_creation_enabled == false`.
+
+Type: `string`
+
+Default: `null`
+
+### <a name="input_log_analytics_workspace_resource_id"></a> [log\_analytics\_workspace\_resource\_id](#input\_log\_analytics\_workspace\_resource\_id)
+
+Description: The resource ID of an existing Log Analytics Workspace to attach to the Container App Environment when `log_analytics_workspace_creation_enabled` is `false`. Preferred over the legacy `log_analytics_workspace_id` input.
 
 Type: `string`
 
@@ -1023,6 +644,27 @@ Has no effect when `container_registry_creation_enabled = false`.
 Type: `bool`
 
 Default: `false`
+
+### <a name="input_runner_visibility"></a> [runner\_visibility](#input\_runner\_visibility)
+
+Description: The trust boundary this runner pool operates under. **GitHub only.** Hard-isolates pools  
+intended for private (corp-network-attached) workloads from pools intended for public  
+workloads (forks, external contributors).
+
+- `private` - pool is attached to the ALZ corp VNet, can reach private endpoints (state SAs, KV).  
+  Labels MUST include one of: `alz-a1`, `alz-p1`, `alz-corp`, or `private-runner` so consumer  
+  workflows in private repos can target it explicitly and cannot accidentally land on a public pool.
+- `public`  - pool is isolated, has NO ALZ corp network access, NO access to corp KV/state.  
+  Labels MUST include `public-runner` or a `pub-*` prefix. Use this for pools that service  
+  public repos / fork PRs where workflow code is untrusted.
+
+This is enforced at plan time by validation on `version_control_system_runner_labels` below.  
+Mixing public and private workloads on the same pool is a network/credential exposure risk -  
+keep them on separate module deployments with different visibility values.
+
+Type: `string`
+
+Default: `"private"`
 
 ### <a name="input_tags"></a> [tags](#input\_tags)
 
@@ -1168,6 +810,14 @@ Description: The base URL for GitHub. Use `github.com` for standard GitHub, or `
 Type: `string`
 
 Default: `"github.com"`
+
+### <a name="input_version_control_system_keda_enable_etags"></a> [version\_control\_system\_keda\_enable\_etags](#input\_version\_control\_system\_keda\_enable\_etags)
+
+Description: When true, sets `enableEtags = "true"` on the KEDA `github-runner` scaler so the scaler uses HTTP ETag conditional requests when polling the GitHub API, reducing API consumption when nothing has changed since the previous poll. Requires KEDA >= 2.17. **GitHub only.**
+
+Type: `bool`
+
+Default: `false`
 
 ### <a name="input_version_control_system_personal_access_token"></a> [version\_control\_system\_personal\_access\_token](#input\_version\_control\_system\_personal\_access\_token)
 

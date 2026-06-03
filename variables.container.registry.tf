@@ -88,12 +88,6 @@ variable "default_image_repository_url" {
   description = "The URL of the default image repository."
 }
 
-variable "use_default_container_image" {
-  type        = bool
-  default     = true
-  description = "Whether to use the default container image provided by the module."
-}
-
 variable "runner_acr_push_enabled" {
   type        = bool
   default     = false
@@ -106,4 +100,10 @@ Set to `true` when your workflows need to push images. The platform module does 
 
 Has no effect when `container_registry_creation_enabled = false`.
 DESCRIPTION
+}
+
+variable "use_default_container_image" {
+  type        = bool
+  default     = true
+  description = "Whether to use the default container image provided by the module."
 }
