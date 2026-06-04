@@ -10,9 +10,15 @@ permissions:
   contents: read
 
 jobs:
+  decide-runner:
+    uses: martinopedal/github-runners-alz-corp-cookbook/.github/workflows/decide-runner.yml@v1
+    with:
+      self-hosted-labels: '["self-hosted", "personal", "pub", "linux"]'
+
   terraform:
+    needs: decide-runner
     name: Terraform Validate
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(needs.decide-runner.outputs.runner-labels) }}
     steps:
       - name: Checkout
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v6.0.3
@@ -32,8 +38,9 @@ jobs:
         run: terraform fmt -check -recursive
 
   style:
+    needs: decide-runner
     name: Style Check
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(needs.decide-runner.outputs.runner-labels) }}
     steps:
       - name: Checkout
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v6.0.3
