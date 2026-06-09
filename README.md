@@ -18,7 +18,7 @@ Works with:
 
 ## Network egress requirements
 
-Force-tunneled ALZ spokes must allow the runner dependencies documented in [EGRESS.md](./EGRESS.md) at the hub Azure Firewall. The canonical implemented list for this estate is maintained in `alz-avm-tf-demo/alz-firewall-ops` as `FIREWALL-EGRESS-IMPLEMENTED.md`.
+Force-tunneled landing-zone spokes must allow the runner dependencies documented in [EGRESS.md](./EGRESS.md) at the hub Azure Firewall before deployment.
 
 ## Quick Start
 
@@ -792,6 +792,30 @@ Type: `string`
 
 Default: `null`
 
+### <a name="input_custom_container_image"></a> [custom\_container\_image](#input\_custom\_container\_image)
+
+Description: Fully qualified custom runner container image to run in the ACA Job. When set, this overrides the module-built/default image in the job container template.
+
+Type: `string`
+
+Default: `null`
+
+### <a name="input_custom_container_image_registry_credential"></a> [custom\_container\_image\_registry\_credential](#input\_custom\_container\_image\_registry\_credential)
+
+Description: Optional registry credential for custom\_container\_image. password\_secret\_ref must match a Container Apps secret name available on the job, for example one supplied through container\_app\_sensitive\_environment\_variables.
+
+Type:
+
+```hcl
+object({
+    server              = string
+    username            = string
+    password_secret_ref = string
+  })
+```
+
+Default: `null`
+
 ### <a name="input_custom_container_registry_id"></a> [custom\_container\_registry\_id](#input\_custom\_container\_registry\_id)
 
 Description: The ID of an existing container registry. Only used if `container_registry_creation_enabled` is `false`.
@@ -1024,6 +1048,27 @@ Type: `bool`
 
 Default: `false`
 
+### <a name="input_runner_visibility"></a> [runner\_visibility](#input\_runner\_visibility)
+
+Description: The trust boundary this runner pool operates under. **GitHub only.** Hard-isolates pools  
+intended for private (corp-network-attached) workloads from pools intended for public  
+workloads (forks, external contributors).
+
+- `private` - pool is attached to the ALZ corp VNet, can reach private endpoints (state SAs, KV).  
+  Labels MUST include `private-runner`, `alz-corp`, or a `priv-` or `alz-` prefixed label so consumer  
+  workflows in private repos can target it explicitly and cannot accidentally land on a public pool.
+- `public`  - pool is isolated, has NO ALZ corp network access, NO access to corp KV/state.  
+  Labels MUST include `public-runner` or a `pub-*` prefix. Use this for pools that service  
+  public repos / fork PRs where workflow code is untrusted.
+
+This is enforced at plan time by validation on `version_control_system_runner_labels` below.  
+Mixing public and private workloads on the same pool is a network/credential exposure risk -  
+keep them on separate module deployments with different visibility values.
+
+Type: `string`
+
+Default: `"private"`
+
 ### <a name="input_tags"></a> [tags](#input\_tags)
 
 Description: (Optional) Tags of the resource.
@@ -1168,6 +1213,14 @@ Description: The base URL for GitHub. Use `github.com` for standard GitHub, or `
 Type: `string`
 
 Default: `"github.com"`
+
+### <a name="input_version_control_system_keda_enable_etags"></a> [version\_control\_system\_keda\_enable\_etags](#input\_version\_control\_system\_keda\_enable\_etags)
+
+Description: When true, sets `enableEtags = "true"` on the KEDA `github-runner` scaler so the scaler uses HTTP ETag conditional requests when polling the GitHub API, reducing API consumption when nothing has changed since the previous poll. Requires KEDA >= 2.17. **GitHub only.**
+
+Type: `bool`
+
+Default: `false`
 
 ### <a name="input_version_control_system_personal_access_token"></a> [version\_control\_system\_personal\_access\_token](#input\_version\_control\_system\_personal\_access\_token)
 
@@ -1421,7 +1474,7 @@ Version: 0.5.0
 
 Source: Azure/avm-res-storage-storageaccount/azurerm
 
-Version: 0.7.0
+Version: 0.7.1
 
 <!-- markdownlint-disable-next-line MD041 -->
 ## Data Collection

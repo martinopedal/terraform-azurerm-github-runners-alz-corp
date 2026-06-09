@@ -125,11 +125,11 @@ DESCRIPTION
       var.version_control_system_type == "github" && var.runner_visibility == "private"
       ? anytrue([
         for l in var.version_control_system_runner_labels :
-        contains(["alz-a1", "alz-p1", "alz-corp", "private-runner"], lower(l))
+        lower(l) == "private-runner" || startswith(lower(l), "priv-") || lower(l) == "priv" || startswith(lower(l), "alz-")
       ])
       : true
     )
-    error_message = "When runner_visibility = 'private', version_control_system_runner_labels MUST include one of: 'alz-a1', 'alz-p1', 'alz-corp', 'private-runner'. This prevents public-repo workflows from accidentally landing on a corp-network-attached pool. See variable docs for runner_visibility."
+    error_message = "When runner_visibility = 'private', version_control_system_runner_labels MUST include 'private-runner', 'priv', or a label starting with 'priv-' or 'alz-'. This prevents public-repo workflows from accidentally landing on a corp-network-attached pool. See variable docs for runner_visibility."
   }
 
   validation {
@@ -212,7 +212,7 @@ intended for private (corp-network-attached) workloads from pools intended for p
 workloads (forks, external contributors).
 
 - `private` - pool is attached to the ALZ corp VNet, can reach private endpoints (state SAs, KV).
-  Labels MUST include one of: `alz-a1`, `alz-p1`, `alz-corp`, or `private-runner` so consumer
+  Labels MUST include `private-runner`, `alz-corp`, or a `priv-` or `alz-` prefixed label so consumer
   workflows in private repos can target it explicitly and cannot accidentally land on a public pool.
 - `public`  - pool is isolated, has NO ALZ corp network access, NO access to corp KV/state.
   Labels MUST include `public-runner` or a `pub-*` prefix. Use this for pools that service

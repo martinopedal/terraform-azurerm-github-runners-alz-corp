@@ -51,12 +51,12 @@ avm.tflint_module.merged.hcl
 examples/*/policy
 *.mptfbackup
 .avm
-# Squad: ignore runtime state (logs, inbox, sessions)
-.squad/orchestration-log/
-.squad/log/
-.squad/decisions/inbox/
-.squad/sessions/
-.squad/.scratch/
-.squad/.cache/
-# Squad: SubSquad activation file (local to this machine)
+# Squad internal orchestration state (kept local, never published)
+.squad/
 .squad-workstream
+.copilot/
+.github/agents/
+.github/workflows/squad-heartbeat.yml
+.github/workflows/squad-issue-assign.yml
+.github/workflows/squad-triage.yml
+.github/workflows/sync-squad-labels.yml

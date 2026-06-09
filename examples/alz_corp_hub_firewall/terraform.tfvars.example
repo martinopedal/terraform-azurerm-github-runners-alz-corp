@@ -1,8 +1,8 @@
-subscription_id              = "2dc87627-13ca-4dae-a46b-817b528b57ec"
-connectivity_subscription_id = "2be052bf-31b0-4693-8081-bf6556421934"
+subscription_id              = "00000000-0000-0000-0000-000000000000"
+connectivity_subscription_id = "11111111-1111-1111-1111-111111111111"
 
-container_app_subnet_id                       = "/subscriptions/2dc87627-13ca-4dae-a46b-817b528b57ec/resourceGroups/rg-corp-aca-runners-swedencentral-001/providers/Microsoft.Network/virtualNetworks/vnet-corp-aca-runners-swedencentral/subnets/snet-aca"
-container_registry_private_endpoint_subnet_id = "/subscriptions/2dc87627-13ca-4dae-a46b-817b528b57ec/resourceGroups/rg-corp-aca-runners-swedencentral-001/providers/Microsoft.Network/virtualNetworks/vnet-corp-aca-runners-swedencentral/subnets/snet-private-endpoints"
-hub_vnet_id                                   = "/subscriptions/2be052bf-31b0-4693-8081-bf6556421934/resourceGroups/rg-connectivity-hub-swedencentral-001/providers/Microsoft.Network/virtualNetworks/vnet-hub-swedencentral"
+container_app_subnet_id                       = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-aca-runners-example/providers/Microsoft.Network/virtualNetworks/vnet-spoke-example/subnets/snet-aca"
+container_registry_private_endpoint_subnet_id = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-aca-runners-example/providers/Microsoft.Network/virtualNetworks/vnet-spoke-example/subnets/snet-private-endpoints"
+hub_vnet_id                                   = "/subscriptions/11111111-1111-1111-1111-111111111111/resourceGroups/rg-connectivity-hub-example/providers/Microsoft.Network/virtualNetworks/vnet-hub-example"
 azure_firewall_private_ip                     = "10.0.0.4"
 github_personal_access_token                  = "replace-with-github-runner-token"

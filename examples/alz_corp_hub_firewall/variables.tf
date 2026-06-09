@@ -17,7 +17,7 @@ variable "location" {
 variable "runner_resource_group_name" {
   description = "Resource group for corp runner resources."
   type        = string
-  default     = "rg-corp-aca-runners-swedencentral-001"
+  default     = "rg-aca-runners-example"
 }
 
 variable "container_app_subnet_id" {
@@ -49,13 +49,13 @@ variable "azure_firewall_private_ip" {
 variable "github_organization" {
   description = "GitHub organization for runner registration."
   type        = string
-  default     = "alz-avm-tf-demo"
+  default     = "my-org"
 }
 
 variable "github_repository" {
   description = "GitHub repository for repository-scoped runners."
   type        = string
-  default     = "alz-aca-runners"
+  default     = "my-repo"
 }
 
 variable "github_personal_access_token" {
