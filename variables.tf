@@ -29,7 +29,7 @@ variable "container_registry_private_endpoint_subnet_id" {
 variable "container_registry_dns_zone_id" {
   type        = string
   default     = null
-  description = "The ID of the private DNS zone for the container registry (`privatelink.azurecr.io`). If null, DNS resolution is assumed to be handled by Azure Policy or central DNS infrastructure."
+  description = "The ID of the private DNS zone for the container registry (`privatelink.azurecr.io`). The Container App Job pulls its runner image from the private registry over a private endpoint, so this DNS must resolve to that endpoint. If null, resolution is assumed to be handled centrally (for example by Azure Policy or central DNS); without a linked `privatelink.azurecr.io` zone the job fails to start with `unable to pull image`."
 }
 
 variable "delays" {

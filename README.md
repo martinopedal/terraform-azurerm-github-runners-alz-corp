@@ -20,6 +20,13 @@ Works with:
 
 Force-tunneled landing-zone spokes must allow the runner dependencies documented in [EGRESS.md](./EGRESS.md) at the hub Azure Firewall before deployment.
 
+## Prerequisites
+
+This module consumes networking from the surrounding landing zone and expects the platform to provide:
+
+- **Subnets with a Network Security Group.** The `container_app_subnet_id` (delegated to `Microsoft.App/environments`) and `container_registry_private_endpoint_subnet_id` you pass in must already exist. Many landing zones enforce an Azure Policy that denies subnets without an NSG, so ensure the subnets you supply have one attached.
+- **Private DNS for the container registry.** The module creates a Premium Azure Container Registry with public network access disabled and reaches it through a private endpoint. The Container App Job pulls its runner image from that registry over the private endpoint, so `privatelink.azurecr.io` must resolve to the private endpoint. Supply the zone with `container_registry_dns_zone_id`, or rely on a centrally managed private DNS zone (for example linked by Azure Policy). Without it the job fails to start with `unable to pull image`.
+
 ## Quick Start
 
 ### Version pinning
@@ -778,7 +785,7 @@ Default: `true`
 
 ### <a name="input_container_registry_dns_zone_id"></a> [container\_registry\_dns\_zone\_id](#input\_container\_registry\_dns\_zone\_id)
 
-Description: The ID of the private DNS zone for the container registry (`privatelink.azurecr.io`). If null, DNS resolution is assumed to be handled by Azure Policy or central DNS infrastructure.
+Description: The ID of the private DNS zone for the container registry (`privatelink.azurecr.io`). The Container App Job pulls its runner image from the private registry over a private endpoint, so this DNS must resolve to that endpoint. If null, resolution is assumed to be handled centrally (for example by Azure Policy or central DNS); without a linked `privatelink.azurecr.io` zone the job fails to start with `unable to pull image`.
 
 Type: `string`
 
