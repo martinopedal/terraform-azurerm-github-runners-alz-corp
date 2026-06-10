@@ -49,26 +49,34 @@ locals {
     { name = "AZP_AGENT_NAME_PREFIX", value = local.version_control_system_agent_name_prefix }
   ]
 
-  environment_variables_github = var.version_control_system_authentication_method == "pat" ? [
-    { name = "RUNNER_NAME_PREFIX", value = local.version_control_system_agent_name_prefix },
-    { name = "REPO_URL", value = local.github_repository_url },
-    { name = "RUNNER_SCOPE", value = var.version_control_system_runner_scope },
-    { name = "EPHEMERAL", value = "true" },
-    { name = "ORG_NAME", value = var.version_control_system_organization },
-    { name = "ENTERPRISE_NAME", value = var.version_control_system_enterprise },
-    { name = "RUNNER_GROUP", value = var.version_control_system_runner_group },
-    { name = "GITHUB_HOST", value = var.version_control_system_github_url }
-    ] : [
-    { name = "RUNNER_NAME_PREFIX", value = local.version_control_system_agent_name_prefix },
-    { name = "REPO_URL", value = local.github_repository_url },
-    { name = "RUNNER_SCOPE", value = var.version_control_system_runner_scope },
-    { name = "EPHEMERAL", value = "true" },
-    { name = "ORG_NAME", value = var.version_control_system_organization },
-    { name = "ENTERPRISE_NAME", value = var.version_control_system_enterprise },
-    { name = "RUNNER_GROUP", value = var.version_control_system_runner_group },
-    { name = "APP_ID", value = var.version_control_system_github_application_id },
-    { name = "GITHUB_HOST", value = var.version_control_system_github_url }
-  ]
+  environment_variables_github = concat(
+    # Base env vars (common to all auth methods)
+    [
+      { name = "RUNNER_NAME_PREFIX", value = local.version_control_system_agent_name_prefix },
+      { name = "REPO_URL", value = local.github_repository_url },
+      { name = "RUNNER_SCOPE", value = var.version_control_system_runner_scope },
+      { name = "EPHEMERAL", value = "true" },
+      { name = "ORG_NAME", value = var.version_control_system_organization },
+      { name = "ENTERPRISE_NAME", value = var.version_control_system_enterprise },
+      { name = "RUNNER_GROUP", value = var.version_control_system_runner_group },
+      { name = "GITHUB_HOST", value = var.version_control_system_github_url },
+    ],
+    # App-specific env vars (when authentication_method = github_app)
+    var.version_control_system_authentication_method == "github_app" ? [
+      { name = "APP_ID", value = var.version_control_system_github_application_id },
+      { name = "APP_INSTALLATION_ID", value = var.version_control_system_github_application_installation_id },
+    ] : [],
+    # Dual-auth mode (RUNNER_AUTH_MODE)
+    [{ name = "RUNNER_AUTH_MODE", value = var.version_control_system_runner_auth_mode }],
+    # Multi-repo registration (TARGET_REPOS for repo-scope)
+    length(var.version_control_system_target_repositories) > 0 ? [
+      { name = "TARGET_REPOS", value = join(",", var.version_control_system_target_repositories) }
+    ] : [],
+    # DISABLE_AUTO_UPDATE
+    var.version_control_system_disable_auto_update ? [
+      { name = "DISABLE_AUTO_UPDATE", value = "true" }
+    ] : [],
+  )
 }
 
 locals {
@@ -96,9 +104,16 @@ locals {
     { name = "AZP_TOKEN", value = var.version_control_system_personal_access_token, container_app_secret_name = "personal-access-token", keda_auth_name = var.webhook_scaling_enabled ? null : "personalAccessToken" }
   ]
 
-  sensitive_environment_variables_github = var.version_control_system_authentication_method == "pat" ? [
-    { name = "ACCESS_TOKEN", value = var.version_control_system_personal_access_token, container_app_secret_name = "personal-access-token", keda_auth_name = var.webhook_scaling_enabled ? null : "personalAccessToken" }
+  sensitive_environment_variables_github = concat(
+    # Primary auth secret (PAT or App)
+    var.version_control_system_authentication_method == "pat" ? [
+      { name = "ACCESS_TOKEN", value = var.version_control_system_personal_access_token, container_app_secret_name = "personal-access-token", keda_auth_name = var.webhook_scaling_enabled ? null : "personalAccessToken" }
     ] : [
-    { name = "APP_PRIVATE_KEY", value = var.version_control_system_github_application_key, container_app_secret_name = "application-key", keda_auth_name = var.webhook_scaling_enabled ? null : "appKey" }
-  ]
+      { name = "APP_PRIVATE_KEY", value = var.version_control_system_github_application_key, container_app_secret_name = "application-key", keda_auth_name = var.webhook_scaling_enabled ? null : "appKey" }
+    ],
+    # PAT fallback (when runner_auth_mode = auto or pat)
+    (var.version_control_system_runner_auth_mode == "auto" || var.version_control_system_runner_auth_mode == "pat") && var.version_control_system_pat_fallback_secret_value != null ? [
+      { name = "PAT_FALLBACK_ACCESS_TOKEN", value = var.version_control_system_pat_fallback_secret_value, container_app_secret_name = "pat-fallback-token", keda_auth_name = null }
+    ] : [],
+  )
 }
