@@ -3,7 +3,7 @@ module "container_app_job" {
 
   container_app_environment_id               = local.container_app_environment_id
   container_cpu                              = var.container_app_container_cpu
-  container_image_name                       = local.container_images["container_app"].image_names[0]
+  container_image_name                       = var.custom_container_image != null ? "" : local.container_images["container_app"].image_names[0]
   container_memory                           = var.container_app_container_memory
   environment_variables                      = local.environment_variables
   job_container_name                         = var.container_app_job_container_name
