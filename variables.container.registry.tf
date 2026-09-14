@@ -32,6 +32,12 @@ variable "custom_container_registry_id" {
   description = "The ID of an existing container registry. Only used if `container_registry_creation_enabled` is `false`."
 }
 
+variable "custom_container_registry_pull_role_assignment_enabled" {
+  type        = bool
+  default     = true
+  description = "Whether the module creates AcrPull on a supplied custom container registry. Disable when the role assignment is managed externally."
+}
+
 variable "custom_container_registry_images" {
   type = map(object({
     task_name            = string
