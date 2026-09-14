@@ -16,7 +16,7 @@ module "container_registry" {
 }
 
 resource "azapi_resource" "custom_container_registry_pull" {
-  count = var.custom_container_registry_id != null ? 1 : 0
+  count = var.custom_container_registry_id != null && var.custom_container_registry_pull_role_assignment_enabled ? 1 : 0
 
   name      = uuidv5("dns", "${var.custom_container_registry_id}-${local.user_assigned_managed_identity_principal_id}-AcrPull")
   parent_id = var.custom_container_registry_id
