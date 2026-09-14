@@ -2,6 +2,14 @@ locals {
   keda_meta_data       = tomap(jsondecode(local.keda_meta_data_final))
   keda_meta_data_final = var.webhook_scaling_enabled ? jsonencode(local.keda_meta_data_webhook) : (var.version_control_system_type == "azuredevops" ? jsonencode(local.keda_meta_data_azure_devops) : jsonencode(local.keda_meta_data_github))
 
+  # KEDA github-runner scaler `repos` poll list. When repo-scope multi-repo is configured via
+  # version_control_system_target_repositories, the scaler must poll ALL of those repos so a job
+  # queued in any of them triggers a scale-up. Otherwise the scaler only polls the single
+  # version_control_system_repository and jobs in the other target repos sit queued forever
+  # (they only run if they coincide with a job in the single polled repo). The runner entrypoint
+  # already iterates TARGET_REPOS to register to the repo with the matching queued job.
+  keda_github_repos = length(var.version_control_system_target_repositories) > 0 ? join(",", var.version_control_system_target_repositories) : var.version_control_system_repository
+
   keda_meta_data_webhook = {
     queueName   = var.webhook_queue_name
     accountName = local.webhook_storage_account_name
@@ -16,13 +24,13 @@ locals {
   keda_meta_data_github = merge(
     var.version_control_system_authentication_method == "pat" ? {
       owner                     = var.version_control_system_organization
-      repos                     = var.version_control_system_repository
+      repos                     = local.keda_github_repos
       targetWorkflowQueueLength = var.version_control_system_agent_target_queue_length
       runnerScope               = var.version_control_system_runner_scope
       githubApiURL              = var.version_control_system_github_url != "github.com" ? "https://api.${var.version_control_system_github_url}" : ""
       } : {
       owner                     = var.version_control_system_organization
-      repos                     = var.version_control_system_repository
+      repos                     = local.keda_github_repos
       targetWorkflowQueueLength = var.version_control_system_agent_target_queue_length
       runnerScope               = var.version_control_system_runner_scope
       applicationID             = var.version_control_system_github_application_id
@@ -108,7 +116,7 @@ locals {
     # Primary auth secret (PAT or App)
     var.version_control_system_authentication_method == "pat" ? [
       { name = "ACCESS_TOKEN", value = var.version_control_system_personal_access_token, container_app_secret_name = "personal-access-token", keda_auth_name = var.webhook_scaling_enabled ? null : "personalAccessToken" }
-    ] : [
+      ] : [
       { name = "APP_PRIVATE_KEY", value = var.version_control_system_github_application_key, container_app_secret_name = "application-key", keda_auth_name = var.webhook_scaling_enabled ? null : "appKey" }
     ],
     # PAT fallback (when runner_auth_mode = auto or pat)
