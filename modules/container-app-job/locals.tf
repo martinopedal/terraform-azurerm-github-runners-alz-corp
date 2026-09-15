@@ -18,7 +18,7 @@ locals {
   secret_environment_variables = [for env in var.sensitive_environment_variables : {
     name      = env.name
     secretRef = env.container_app_secret_name
-  } if env.value != null]
+  } if env.container_app_secret_name != null]
   secrets = concat([for env in var.sensitive_environment_variables : {
     name  = env.container_app_secret_name
     value = env.value
@@ -82,4 +82,3 @@ locals {
     identity = var.user_assigned_managed_identity_id
   } : {})
 }
-

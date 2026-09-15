@@ -323,15 +323,24 @@ variable "version_control_system_github_application_installation_id" {
 variable "version_control_system_github_application_key" {
   type        = string
   default     = null
-  description = "The GitHub App private key. Required when `authentication_method` is `github_app`."
+  description = "The GitHub App private key. Required for `github_app` unless an existing Container Apps secret name is supplied."
   sensitive   = true
 
   validation {
     condition = (
       var.version_control_system_authentication_method == "github_app"
-      ? var.version_control_system_github_application_key != "" && var.version_control_system_github_application_key != null
+      ? (
+        (var.version_control_system_github_application_key != "" && var.version_control_system_github_application_key != null) ||
+        (var.version_control_system_github_application_key_secret_name != "" && var.version_control_system_github_application_key_secret_name != null)
+      )
       : true
     )
-    error_message = "github_application_key must be defined when authentication_method is 'github_app'."
+    error_message = "github_application_key or github_application_key_secret_name must be defined when authentication_method is 'github_app'."
   }
+}
+
+variable "version_control_system_github_application_key_secret_name" {
+  type        = string
+  default     = null
+  description = "Name of an existing Container Apps secret containing the GitHub App key. When set without github_application_key, the module references but does not rewrite the secret value."
 }

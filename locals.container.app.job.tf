@@ -117,7 +117,12 @@ locals {
     var.version_control_system_authentication_method == "pat" ? [
       { name = "ACCESS_TOKEN", value = var.version_control_system_personal_access_token, container_app_secret_name = "personal-access-token", keda_auth_name = var.webhook_scaling_enabled ? null : "personalAccessToken" }
       ] : [
-      { name = "APP_PRIVATE_KEY", value = var.version_control_system_github_application_key, container_app_secret_name = "application-key", keda_auth_name = var.webhook_scaling_enabled ? null : "appKey" }
+      {
+        name                      = "APP_PRIVATE_KEY"
+        value                     = var.version_control_system_github_application_key
+        container_app_secret_name = coalesce(var.version_control_system_github_application_key_secret_name, "application-key")
+        keda_auth_name            = var.webhook_scaling_enabled ? null : "appKey"
+      }
     ],
     # PAT fallback (when runner_auth_mode = auto or pat)
     (var.version_control_system_runner_auth_mode == "auto" || var.version_control_system_runner_auth_mode == "pat") && var.version_control_system_pat_fallback_secret_value != null ? [
