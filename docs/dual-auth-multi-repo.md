@@ -116,7 +116,7 @@ When you set the variables above, the module injects these env vars into the run
 | `ORG_NAME` | `version_control_system_organization` | GitHub org name |
 | `RUNNER_SCOPE` | `version_control_system_runner_scope` | `"org"` or `"repo"` |
 | `TARGET_REPOS` | `version_control_system_target_repositories` | Comma-separated repo names (repo-scope multi-repo) |
-| `RUNNER_LABELS` | `version_control_system_runner_labels` | `"LABELS"` (not `RUNNER_LABELS` — AVM compat) |
+| `RUNNER_LABELS` | `version_control_system_runner_labels` | `"LABELS"` (not `RUNNER_LABELS`; AVM compatibility) |
 | `RUNNER_AUTH_MODE` | `version_control_system_runner_auth_mode` | `"auto"`, `"github_app"`, or `"pat"` |
 | `APP_ID` | `version_control_system_github_application_id` | GitHub App ID |
 | `APP_INSTALLATION_ID` | `version_control_system_github_application_installation_id` | GitHub App installation ID |
@@ -145,10 +145,10 @@ metadata = {
 
 ## Authority
 
-- `.squad/decisions/inbox/copilot-directive-runner-dual-auth-2026-06-09.md` — Martin's directive for dual-auth requirement.
-- `.squad/decisions.md` ADR-BATCH5-* — ALZ network rollout decisions (context for why caj-a1 matters).
-- `martinopedal/personal-runners-infra` — Proven register-and-wait pattern (Pool P1).
-- `alz-avm-tf-demo/alz-aca-runners` — Org corp runner pool (Pool A2, will consume this module post-v1.1.0).
+- `.squad/decisions/inbox/copilot-directive-runner-dual-auth-2026-06-09.md`: Martin's directive for dual-auth requirement.
+- `.squad/decisions.md` ADR-BATCH5-*: ALZ network rollout decisions (context for why caj-a1 matters).
+- `martinopedal/personal-runners-infra`: Proven register-and-wait pattern (Pool P1).
+- `alz-avm-tf-demo/alz-aca-runners`: Org corp runner pool (Pool A2, will consume this module post-v1.1.0).
 
 ## Migration from v1.0.0 to v1.1.0
 
@@ -190,9 +190,9 @@ Store the PKCS#8 PEM in Key Vault, reference it via `version_control_system_gith
 
 **Diagnosis:**
 
-1. `runner_auth_mode = "github_app"` (no fallback) — change to `"auto"`.
-2. `version_control_system_pat_fallback_secret_value` not set — add it.
-3. Entrypoint logs show `🔐 Auth mode: github_app (no fallback)` — confirms App-only mode.
+1. `runner_auth_mode = "github_app"` (no fallback): change to `"auto"`.
+2. `version_control_system_pat_fallback_secret_value` not set: add it.
+3. Entrypoint logs show `🔐 Auth mode: github_app (no fallback)`: confirms App-only mode.
 
 **Symptom:** Runners register but jobs land on the wrong runner pool.
 
@@ -203,6 +203,6 @@ Store the PKCS#8 PEM in Key Vault, reference it via `version_control_system_gith
 
 ## See Also
 
-- [FIREWALL-RULES.md](FIREWALL-RULES.md) — Network requirements for runners (PE-only ACR, GitHub API egress).
-- [WEBHOOKS.md](WEBHOOKS.md) — Webhook scaling mode (alternative to KEDA's GitHub API polling).
-- [examples/](examples/) — Full working examples of dual-auth + multi-repo.
+- [FIREWALL-RULES.md](FIREWALL-RULES.md): Network requirements for runners (PE-only ACR, GitHub API egress).
+- [WEBHOOKS.md](WEBHOOKS.md): Webhook scaling mode (alternative to KEDA's GitHub API polling).
+- [examples/](examples/): Full working examples of dual-auth + multi-repo.
